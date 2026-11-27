@@ -32,6 +32,9 @@ class Twin:
     cy_um: float
     theta_rad: float            # heading
     phi_rad: float              # tilt
+    B_pilot_gl: float           # the pilot's B_bar (gl): read by the scan's stripe support (amendment 1)
+    d_pilot_um: float           # the pilot's d_hat_um (um): the scan's own-cylinder diameter (amendment 1)
+    alpha_pilot: float          # the pilot's alpha_hat (amendment 1)
     ks: np.ndarray              # (n,) int64 plane indices of the real scan
     B_gl: np.ndarray            # (n,) the real plane's background at the node (PlaneScan.B_bar)
     noise_sd_gl: np.ndarray     # (n,) the real plane's background SD (PlaneScan.bg_sd_gl)
@@ -45,14 +48,16 @@ def build_twins(cell_id, scans, nodes, chosen_ids):
     """list[Twin] in the order of chosen_ids, role "train": scans a sequence of PlaneScan, nodes {node id: node
     record} (Block 52's CellScans). ValueError naming every offending node id: no scan, no record, a record whose
     set differs from the scan's, a non-finite or non-positive allen_diameter_um, a pilot without finite
-    mu_hat_per_um > 0, cx_um, cy_um, theta_rad, phi_rad, z_sub_um or without k_star, a scan without bg_sd_gl."""
+    mu_hat_per_um > 0, cx_um, cy_um, theta_rad, phi_rad, z_sub_um, alpha_hat, finite B_bar > 0 and d_hat_um > 0, or
+    without k_star; a scan without bg_sd_gl; a scan whose k_star differs from the pilot's or whose z_sub_um differs
+    from the pilot's by more than 1e-9 um (amendment 1)."""
     raise NotImplementedError("Block 53")
 
 
 def split_twins(twins, validation_fraction, seed):
     """The twins in the same order with their roles set (D-274.4): by node, stratified by set and by cell, the
-    rule of SPEC Block 53 (largest remainders, a cell never emptied of training twins, a seeded permutation of the
-    sorted node ids). Independent of the input order. ValueError: a fraction outside [0, 1); two twins with one
+    rule of SPEC Block 53 (largest remainders, a cell never emptied of training twins, a seat a capped cell cannot
+    take passed on in repeated passes, a seeded permutation of the sorted node ids). Independent of the input order. ValueError: a fraction outside [0, 1); two twins with one
     (cell_id, node_id)."""
     raise NotImplementedError("Block 53")
 

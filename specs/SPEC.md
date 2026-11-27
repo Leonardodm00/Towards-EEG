@@ -2590,18 +2590,24 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
 - Public API:
   - `Twin` (frozen dataclass; arrays (n,) over the real scan's planes, read-only): `cell_id` int; `node_id` int;
     `set` "near" | "far"; `role` "train" | "validation"; `d_um` float (Allen's diameter); `mu_per_um` float (the
-    pilot's); `k_star` int; `z_sub_um`, `cx_um`, `cy_um`, `theta_rad`, `phi_rad` float (the pilot's); `ks` int64;
+    pilot's); `k_star` int; `z_sub_um`, `cx_um`, `cy_um`, `theta_rad`, `phi_rad` float (the pilot's); `B_pilot_gl`, `d_pilot_um`,
+    `alpha_pilot` float (the pilot's `B_bar`, `d_hat_um`, `alpha_hat`: what the scan's masks read from its node;
+    amendment 1); `ks` int64;
     `B_gl` float64 (`PlaneScan.B_bar`); `noise_sd_gl` float64 (`PlaneScan.bg_sd_gl`); `omega_um2`, `se_omega_um2`,
     `area_gl_um` float64; `status` tuple of str.
   - `build_twins(cell_id, scans, nodes, chosen_ids) -> list[Twin]`, in the order of `chosen_ids`, role "train".
     ValueError naming every offending node id: no scan, no record, a record whose `set` differs from the scan's
     `set`, a non-finite or non-positive `allen_diameter_um`, a pilot without finite `mu_hat_per_um` > 0, `cx_um`,
-    `cy_um`, `theta_rad`, `phi_rad`, `z_sub_um` or without `k_star`, a scan without `bg_sd_gl`.
+    `cy_um`, `theta_rad`, `phi_rad`, `z_sub_um`, `alpha_hat`, finite `B_bar` > 0 and `d_hat_um` > 0, or without
+    `k_star`; a scan without `bg_sd_gl`; a scan whose `k_star` differs from the pilot's or whose `z_sub_um` differs
+    from the pilot's by more than 1e-9 um (amendment 1).
   - `split_twins(twins, validation_fraction, seed) -> list[Twin]` (same order, roles set). Within each set $s$
     with $N_s$ twins the number of validation twins is $V_s = \lfloor f N_s + 1/2 \rfloor$; it is shared among the
     cells in proportion to their $n_{c,s}$ twins by largest remainders (ties to the lower `cell_id`), a cell never
-    giving more than $n_{c,s} - 1$ (a cell with one twin gives none; what cannot be placed is dropped, so
-    $\sum_c V_{c,s} \le V_s$). Inside a cell and set the validation twins are the first $V_{c,s}$ of
+    giving more than $n_{c,s} - 1$ (a cell with one twin gives none). A seat that a cell at its cap cannot take
+    goes to the next cell in the ranking (remainder descending, `cell_id` ascending), one seat per cell per pass,
+    in repeated passes; seats are dropped only when every cell is at its cap, so
+    $\sum_c V_{c,s} = \min(V_s, \sum_c (n_{c,s} - 1))$ (amendment 1). Inside a cell and set the validation twins are the first $V_{c,s}$ of
     `default_rng([seed, cell_id, 0 if near else 1]).permutation` applied to the node ids sorted ascending. The
     result does not depend on the order of `twins`. ValueError: $f$ outside [0, 1); two twins with one
     (`cell_id`, `node_id`).
@@ -2671,10 +2677,11 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
     `background_B_gl` = `(B_gl[q] - rcfg.black_level_gl) / rcfg.gain` and `noise_sd_gl` = `noise_sd_gl[q]`; a plane
     whose `B_gl[q]` is not finite or whose `background_B_gl` would be <= 0 is all zeros with `valid[q]` False.
     `rngs`: a sequence of n generators (unused where the SD is 0).
-  - `twin_scene(twin, cfg, s2cfg) -> (node, branch, scene)`: `node` an object with the attributes the scans read
-    (`node_id`, `d_hat_um` = `d_um`, `phi_rad`, `alpha_hat` = `mu_per_um * d_um / cos(phi_rad)`, `k_star`,
-    `z_sub_um`, `cx_um`, `cy_um`, `theta_rad`), all the real pilot's, so that the line and the planes are the real
-    node's; `branch` a straight `Branch` along the twin's axis through (`cx_um`, `cy_um`, `z_sub_um`), nodes every
+  - `twin_scene(twin, cfg, s2cfg) -> (node, branch, scene)`: `node` an object with the attributes the scans read,
+    every one the real pilot's, so that the line, the planes and the background's support (10.S's stripe reads
+    `B_bar`, `mu_hat_per_um` and `d_hat_um`) are the real scan's: `node_id`, `k_star`, `z_sub_um`, `cx_um`, `cy_um`,
+    `theta_rad`, `phi_rad`, `d_hat_um` = `twin.d_pilot_um`, `alpha_hat` = `twin.alpha_pilot`, `B_bar` =
+    `twin.B_pilot_gl`, `mu_hat_per_um` = `twin.mu_per_um` (amendment 1); `branch` a straight `Branch` along the twin's axis through (`cx_um`, `cy_um`, `z_sub_um`), nodes every
     `cfg.phantom.phantom_node_step_um` over +-`tube_half_length_um`, radius `d_um`/2 (`Branch.from_points`);
     `scene` = `Scene.from_branch(branch)`.
   - `noise_rngs(twin, n_planes, s2cfg, replicate) -> list` of n_planes generators, plane $q$ from
@@ -2687,7 +2694,8 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
   - `twin_statistics(twin, stack, scan_cfg, s2cfg, noise=True) -> dict` of (n,) arrays over `stack.ks`: over the
     $R$ = `noise_replicates` replicates (1 when `noise` is False), `omega_um2` the mean of the finite values, NaN
     where fewer than $\lceil R/2 \rceil$ are finite; `omega_sd_um2` their sample SD (NaN for fewer than two);
-    `area_gl_um` and `bg_sd_gl` means; `n_ok` int.
+    `area_gl_um` and `bg_sd_gl` the means over the replicates with a finite value (NaN when none); `n_ok` (n,) int,
+    the replicates with a finite core width (amendment 1).
 - Parameters: `Step2Config.noise_replicates`, `noise_scale`, `seed`, `tube_half_length_um`.
 - Library calls: `model.camera.camera_chain`; `analysis.calibration.plane_scan`; `analysis.far_field.far_plane_scan`;
   `analysis.plane_iteration.Scene`; `allen_image_io.CropFrame`.
@@ -2720,8 +2728,14 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
   $a \in \mathbb R^S$ and local $b \in \mathbb R^{N \times L}$ ($L$ may be 0); model $\hat y_j(a, b_{g(j)})$, an
   observation depending on its own group's row of $b$ only; weights $w_j \ge 0$. The fit minimises
   $\sum_j w_j\,[y_j - \hat y_j(a, b_{g(j)})]^2$ within box bounds, by `scipy.optimize.least_squares`
-  (`method="trf"`, `jac="2-point"` with `jac_sparsity`: the shared columns dense, a local column non-zero on its
-  group's observations only, so one Jacobian costs $S + L$ model calls; `diff_step` per unknown; `x_scale="jac"`).
+  (`method="trf"`, `x_scale="jac"`, `tr_solver="exact"`) with the Jacobian given as a callable (amendment 1): a
+  2-point forward difference with ABSOLUTE steps that uses the structure -- one model call per shared unknown
+  ($a_s + h_s$), and one per local index $l$ with every group's $b_{g,l}$ shifted by $h_l$ at once, an observation
+  depending on its own group's row only -- so one Jacobian costs $S + L$ model calls beside the residual's; a step
+  is taken backwards ($-h$) where $x + h$ would pass the upper bound; the matrix returned is dense. scipy's own
+  `jac="2-point"` is not used: its `diff_step` is relative to the current iterate ($h = $ `diff_step` $\cdot |x|$,
+  scipy 1.18.1), so a step set at the start grows or shrinks with the unknown and falls back to about 1.5e-8 at
+  $x = 0$, useless on a quantised objective **[run]**.
   Covariance of the estimates, clustered by group **[textbook, from memory; the sandwich estimator of generalised
   estimating equations]**: with $r_j = \sqrt{w_j}\,(y_j - \hat y_j)$ and $J$ the Jacobian of $r$ at the solution over
   the free unknowns (those not at a bound),
@@ -2744,17 +2758,20 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
     `se_cluster`, `se_classical` (S,); `n_model_calls` int; `nfev` int; `n_nan_filled` int; `status` int;
     `message` str; `success` bool.
 - Parameters: none of its own (the callers pass `Step2Config`'s steps and `max_nfev`).
-- Library calls: `scipy.optimize.least_squares`; `scipy.sparse` for the pattern; numpy.
-- Custom code: the clustered covariance (a few lines of linear algebra; scipy has none).
+- Library calls: `scipy.optimize.least_squares`; numpy.
+- Custom code: the structured 2-point Jacobian with absolute steps (scipy offers relative steps only) and the
+  clustered covariance (a few lines of linear algebra; scipy has none).
 - Test oracles: (F1) a linear model $\hat y = A a + B_g b_g$ without noise: `shared` and `local` to 1e-8; (F2) a
   non-linear analytic toy (a parabola in the plane offset whose curvature is shared and whose centre is local, the
-  shape of step 2's near stage) against `least_squares` without sparsity: the same solution to 1e-6; (F3)
+  shape of step 2's near stage) against `least_squares` with its own `jac="2-point"`: the same solution to 1e-6;
+  and the callable's Jacobian against the analytic one to the forward difference's truncation error; the steps
+  actually taken at a second iterate equal the absolute steps asked for; (F3)
   `cov_cluster` and `cov_classical` on a linear model against `statsmodels` OLS with `cov_type="cluster"`,
   `use_correction=False`, and its non-robust covariance (1e-8 relative; statsmodels installed for the test, else
   SkipTest naming it); (F4) Monte Carlo, 400 datasets with noise correlated inside groups: the SD of `shared`
   across datasets against the mean `se_cluster` within 15 %, and `se_classical` too small by the expected factor
-  (the comment derives it); (F5) bounds respected and `free` False at an active bound; (F6) `n_model_calls` per
-  Jacobian is $S + L$; (F7) the NaN rules; (F8) $L$ = 0; determinism.
+  (the comment derives it); (F5) bounds respected and `free` False at an active bound; (F6) the model calls per
+  Jacobian are $S + L$, and a step is reversed at an upper bound; (F7) the NaN rules; (F8) $L$ = 0; determinism.
 - Data flow: consumed by Blocks 57 and 58, which build `model` from Blocks 54 and 55.
 - Confirmed: D-273.3 [user]; the NaN rule and the two covariances are the orchestrator's.
 - Status: drafted 2026-11-27.
