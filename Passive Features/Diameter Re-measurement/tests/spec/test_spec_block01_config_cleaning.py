@@ -433,3 +433,94 @@ def test_w7_source_tags_and_readers():
         # kernel_family is also a RendererConfig field: require the inference section's own reads
         pat = r"(inference|icfg|\bi)\.kernel_family\b" if k == "kernel_family" else r"\.%s\b" % k
         assert re.search(pat, blob), "%s is read by nothing outside config.py" % k
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Tester, 2026-11-27 (incremental run at a67b4df): Step2Config (SPEC "Kernel calibration, step 2", Configuration)
+# and Block 15's amendment (far_min_k_offset = 4, D-273.2). Expected values from the spec's text.
+# ---------------------------------------------------------------------------------------------------------------
+
+_STEP2_DEFAULTS = dict(absorption="hybrid", kernel_family="gaussian_table_spline", knots_um=(0.28, 0.56, 0.84),
+                       knot_min_margin_um=0.001, knot_max_um=2.0, near_planes=3, far_planes=(4, 16),
+                       z_ax_bound_um=0.28, weights="inverse_variance", noise_replicates=4, noise_scale=1.0,
+                       seed=20261127, validation_fraction=0.25, split_seed=20261127, diff_step_knot_um=0.005,
+                       diff_step_z_um=0.02, diff_step_gamma=0.02, max_nfev=40, fit_sigma0=False,
+                       tube_half_length_um=40.0, max_workers=1)
+
+
+def test_step2_defaults_as_specified():
+    s = C.default_config().step2
+    assert isinstance(s, C.Step2Config)
+    got = {f.name: getattr(s, f.name) for f in _dc.fields(s)}
+    assert set(got) == set(_STEP2_DEFAULTS)                       # no field the spec does not list
+    for k, v in _STEP2_DEFAULTS.items():
+        assert (tuple(got[k]) if isinstance(v, tuple) else got[k]) == v, k
+
+
+def test_block15_amendment_far_min_k_offset_is_4():
+    c = C.default_config()
+    assert c.calibration.far_min_k_offset == 4
+    # step 2's far stage reads 4 <= |k - k*|: the same lower edge (SPEC Block 15, amendment)
+    assert c.step2.far_planes[0] == c.calibration.far_min_k_offset
+
+
+@pytest.mark.parametrize("key,value", [("step2.noise_replicates", 8), ("step2.knots_um", [0.3, 0.6, 0.9]),
+                                       ("step2.weights", "none"), ("step2.seed", 5), ("step2.fit_sigma0", True),
+                                       ("step2.tube_half_length_um", 30.0), ("step2.validation_fraction", 0.5)])
+def test_step2_outside_every_signature(key, value):
+    c = C.default_config()
+    c2 = C.with_overrides(c, {key: value})
+    sec, name = key.split(".")
+    assert getattr(c2.step2, name) != getattr(c.step2, name)
+    assert _hashes(c2) == _hashes(c)
+    assert (c.signature_hash("estimator"), c.signature_hash("simulation")) == _PINNED
+
+
+@pytest.mark.parametrize("override", [{"step2.weights": "inverse"}, {"step2.validation_fraction": 1.0},
+                                      {"step2.validation_fraction": -0.1}, {"step2.noise_replicates": 0},
+                                      {"step2.knots_um": [0.56, 0.28, 0.84]}, {"step2.absorption": "nope"}])
+def test_step2_validate_refuses(override):
+    with pytest.raises(ValueError):
+        C.with_overrides(C.default_config(), override)
+
+
+def test_step2_source_tags():
+    src = (_Path(C.__file__)).read_text()
+    tree = _ast.parse(src)
+    lines = src.splitlines()
+    cls = [n for n in tree.body if isinstance(n, _ast.ClassDef) and n.name == "Step2Config"]
+    assert cls
+    fields = [s for s in cls[0].body if isinstance(s, _ast.AnnAssign)]
+    assert len(fields) == len(_dc.fields(C.Step2Config))
+    for s in fields:
+        assert "# source:" in lines[s.lineno - 1], lines[s.lineno - 1]
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Step2Config.kernel_family after amendment 3 (tester, 2026-11-27 22:11): the common definitions list only
+# "gaussian_table_spline" (the near stage's "tangent" continuation needs it, D-265); F4 of the 1904 report. Oracles:
+# "gaussian_table" and an unknown family are refused through with_overrides; the default still validates; the
+# configuration files shipped in configs/ still load and validate (regression of the new renderer checks).
+# ---------------------------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("fam", ["gaussian_table", "empirical", "nope"])
+def test_step2_kernel_family_only_the_spline(fam):
+    with pytest.raises(ValueError):
+        C.with_overrides(C.default_config(), {"step2.kernel_family": fam})
+    assert C.with_overrides(C.default_config(), {"step2.kernel_family": "gaussian_table_spline"}).step2.kernel_family \
+        == "gaussian_table_spline"
+
+
+def test_shipped_config_files_still_validate():
+    import json as _json
+    cdir = _Path(C.__file__).resolve().parents[2] / "configs"
+    files = sorted(cdir.glob("*.json"))
+    assert files
+    for p in files:
+        d = _json.loads(p.read_text())
+        try:
+            cfg = C.config_from_dict(d)
+        except (TypeError, KeyError):
+            # an overrides file rather than a full dictionary: applied to the default
+            cfg = C.with_overrides(C.default_config(), d)
+        cfg.validate()
