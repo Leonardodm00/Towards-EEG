@@ -316,6 +316,7 @@ the "Binds" column.
 | 2026-11-27 (the defocus-table chat, 10:15) | With the user's OK (10:05), the ID clash of 2026-11-25 is resolved: the review chat's D-250 (the final check of Blocks 23 to 28, orchestrator), logged 21 minutes after the soma fit's, is renumbered **D-262**; the soma fit's keeps D-250. Changed: the entry's heading and status, its index row (moved after D-261), the two rows of 2026-11-25 above (annotated), the soma entry's status, and the twins handoff on `main` (`Passive Features/HPC script/Ih Fit/docs/TEEG_twins_block5_handoff_2026-11-19.md`). Left as they are: the citations of D-250 in `Ih Fit/` on `sci/twins` (SPEC Block 28's notes, `run_twin_recovery.py`, `smoke_twin_sensitivity.py`, two spec tests), so that Block 28 is not marked changed; they mean D-262. Next free IDs: D-263, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:35) | Logs **D-263** (user): the near stage of D-230 -- step 1 and step 2 on the near-set twins -- uses only the planes up to the third on each side of focus, the anchor's plane; already met by `offsets_planes` = 3 and by D-229.2, now binding. Next free IDs: D-264, I-008. |
 | 2026-11-27 (the defocus-table chat, 10:40) | Logs **D-264** (user): D-230.3's alternation of the calibration's stages is dropped; each stage runs once, near then far (D-230 marked superseded in part; D-263 annotated). Next free IDs: D-265, I-008. |
+| 2026-11-27 (the defocus-table chat, 10:50) | Logs **D-265** (user): in the near stage the kernel past the anchor is the spline's extrapolation, not the linear continuation with a held slope (D-263's and D-264's open points annotated). Next free IDs: D-266, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -568,6 +569,7 @@ would be needed*, *Status*.
 | D-262 (was D-250) | 2026-11-25 | the final check of Blocks 23 to 28 (report 2026-11-25_1700, PASS WITH ISSUES): `run_twin_recovery.loss_verdict`, `recovery_extras.csv`; SPEC Blocks 27, 28 | F1 fixed (amendment 3: under the least-squares refinement the twins' verdict compares $\sqrt{L_2}$ at the truth and at the estimate; a column names the quantity); F3, F4, S1, S2 written into the SPEC as notes; F2 (8 stale spec tests) left for the user [orchestrator] | active; implemented (`9e7be5a`) |
 | D-263 | 2026-11-27 | D-230.1's near stage: step 1 (Block 10, `offsets_planes`) and step 2's near-set twins (Eq. (13); D-229.2) | the near stage, steps 1 and 2, uses only the planes \|k - k*\| <= 3, up to the third plane on each side of focus, the anchor's plane (0.84 um); farther planes only in the far stage [user] | active; met by step 1's code and D-229.2; step 2 not built |
 | D-264 | 2026-11-27 | D-230.3 and the loop of step 2; the order of the kernel calibration's stages | D-230.3 dropped: no alternation; each stage runs once, near (steps 1 and 2, gamma held) then far (far fit and step 2, knots held); the table is the near knots with the far slope [user] | active; not built |
+| D-265 | 2026-11-27 | step 2's near stage: the twins' slices past the anchor (0.84 um); D-263's and D-264's open points; D-181 | in the near stage the kernel past 0.84 um is the spline through the near knots, extrapolated (the assistant's reading: D-181's not-a-knot spline in G, along its tangent), not the linear continuation with a held gamma; the far stage and the table keep gamma [user] | active; not built (needs D-181) |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16234,7 +16236,8 @@ even if a scan records more planes; a smoke check of step 2 should assert it. St
 plus or minus the axis's offset from the nearest plane (up to 0.14 um), and a tube's slices spread it by up to its
 radius, so the outer planes still read the held $\gamma$ through some slices -- on the faint toy a relative change of
 $\gamma$ moves near-set core widths 0.108 (d 0.45-0.55 um) and 0.138 (d 0.75-0.95 um) times as much as the same change
-of $\theta_3$ (T10 study document, check 10) **[doc, run]**; whether those planes are weighted down ($\varpi$, D-229);
+of $\theta_3$ (T10 study document, check 10) **[doc, run]**; whether those planes are weighted down ($\varpi$, D-229) [answered by D-265, 2026-11-27: the slices past the
+anchor take the spline's extrapolation instead];
 D-230.3's alternation (PROVISIONAL) [dropped by D-264, 2026-11-27]; the far stage's first plane (4 in D-229.2, 5 in the far fit,
 `far_min_k_offset`, PROVISIONAL).
 
@@ -16280,5 +16283,56 @@ resulting mismatch between the near knots and the final slope is (not measured: 
 **Sources.** **[user]** 2026-11-27, 10:35. **[log]** D-024, D-230, D-263. **[doc]** the T10 study document, check 10.
 **[src]** `config.py` (`kernel_continuation_slope` = 0.79) on `sci/diameter-pipeline` at `e2c4a4e`.
 
-**Status:** active; not built.
+**Status:** active; not built. [2026-11-27: the open point on the slope the near stage holds is moot under D-265 -- the
+near stage holds none, the kernel past the anchor being the spline's extrapolation.]
+
+---
+
+## D-265 -- In the near stage the kernel past the anchor is the spline's extrapolation, not the linear continuation with a held slope (user)
+
+**Date:** 2026-11-27, 10:37 (Europe/Rome), the defocus-table chat. **Binds:** step 2's near stage (D-230.1, D-263,
+D-264): how its twins' slices past 0.84 um are blurred; D-263's open point (weighting the outer planes down) and
+D-264's (the slope the near stage holds); D-181 (the renderer's spline reading, not built); the step-2 implementation
+handoff (`Passive Features/Diameter Re-measurement/docs/TEEG_kernel_calibration_step2_implementation_handoff_2026-11-24.md`,
+on `sci/diameter-pipeline`), sections 4.5, 8 and 9.
+
+**Decision [user].** Quoting the open point "Whether to weight those outer planes down (the plane weights of D-229) is
+left open": "extrapolate with the spline interpolation."
+
+**Statement.** (D-265.1) In the near stage, a twin's slices whose defocus lies past the anchor ($|\delta| > 0.84$ um,
+reached on the third planes through the axis's offset and the tube's depth) take $\sigma_{\rm r}$ from the spline
+through the near knots, extrapolated, not from the linear continuation with a held $\gamma$ [user]. The assistant's
+reading, PROVISIONAL: the spline is D-181's -- the not-a-knot cubic spline of $G = \sigma_{\rm r}^2 - \sigma_{\rm r}(0)^2$
+on the signed knots, here $-0.84 \dots 0.84$ um with the values $\sigma_{\rm r}(0)$, $\theta_1$, $\theta_2$, $\theta_3$ --
+and it is extrapolated as step 1 extrapolates its own spline (D-181.1): along its tangent at the end knot, linear in
+$G$. Continuing its last cubic piece instead makes $\sigma_{\rm r}$ fall with defocus past about 1.1 um on the pilot
+table (computed below), so it is not used. (D-265.2) The near stage therefore holds no $\gamma$: D-264's open point is
+moot, and the outer planes are not weighted down on this account (D-263's open point) [the assistant's reading].
+(D-265.3) The far stage and the calibrated table are unchanged: beyond 0.84 um the table continues linearly with the
+far stage's $\gamma$ (D-080.1, D-228, D-230.2) [the assistant's reading].
+
+**Why.** The near stage then depends on its own knots and $\sigma_{\rm r}(0)$ only, as step 1 already does (its growth
+fit has a knot at 1.12 um and its spline covers the outer planes, D-080.1, D-181.1), instead of on a slope it does not
+fit [own reasoning].
+
+**What it implies for code and tables.** The renderer that makes the near-stage twins needs D-181's spline reading of
+the table (not built: `model/kernel.py`'s `sigma_r` reads by `np.interp`, linear in $|\delta|$) and a continuation past
+the last knot along the spline's tangent in $G$ (not among `kernel_continuation`'s "linear", "frozen", "proportional");
+it is used in the near stage only, the far stage and the production tables keep "linear" with $\gamma$. On the pilot
+table (0.080, 0.1536, 0.3924, 0.5620 um) the spline's tangent at 0.84 um is $dG/d\delta$ = 0.469 um, a slope of
+$\sigma_{\rm r}$ of 0.417 against the configured $\gamma$ = 0.79: $\sigma_{\rm r}$ = 0.618, 0.669, 0.723 um at 0.98,
+1.12, 1.28 um, against 0.673, 0.783, 0.910 um with $\gamma$ = 0.79; the last cubic piece gives 0.604, 0.609, 0.548 um
+**[run, sandbox: `check_spline_extrapolation.py`, the defocus-table chat]**. Not built.
+
+**What it does not decide.** How far the extrapolation may be trusted (a near-set tube's slices on the third planes
+reach about 1.28 um: 0.84 + 0.14 + its radius up to 0.30 um); the mismatch between the near knots, fitted under the
+spline's extrapolation, and the final table's linear continuation with the fitted $\gamma$ (weak, check 10, not
+measured); the rest of D-229's weights $\varpi$.
+
+**Sources.** **[user]** 2026-11-27, 10:37. **[log]** D-080, D-181, D-228, D-229, D-230, D-263, D-264. **[src]**
+`model/kernel.py`, `analysis/calibration.py` (`_basis`: not-a-knot cubic splines, linear continuation beyond the end
+knots; `fit_growth`: knots up to $Mh$, $M = \lceil (P + 1/2)\,\Delta z / h\rceil$) on `sci/diameter-pipeline` at
+`e2c4a4e`. **[run, sandbox]** `check_spline_extrapolation.py`. **[doc]** the T10 study document, check 10.
+
+**Status:** active; not built (needs D-181's spline in the renderer).
 
