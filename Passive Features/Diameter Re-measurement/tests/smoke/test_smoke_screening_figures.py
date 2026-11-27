@@ -17,6 +17,9 @@ Oracles (SPEC Block 62)
     S5  write_node_sheet writes a non-empty PNG and leaves no open figure     (test_write_sheet)
     and: the same view gives the same PNG bytes twice                         (test_determinism)
     S6  a plane with valid False; ks without k_star raises ValueError         (test_edge_cases)
+    S7  (amendment 1) with zoom_half_um a far view has 68 axes; the first pair shows stack at k* limited to
+        +-zoom_half_um about the pilot's centre (y downwards), its profile to |v| <= zoom_half_um, both with
+        the marks; the other 66 axes are as without it                       (test_zoom)
 
 Run (from the package root)
     python3 tests/smoke/test_smoke_screening_figures.py
@@ -298,6 +301,63 @@ def test_contract():
         plt.close(fig)
 
 
+def _axis_record(ax):
+    """What an axes shows, for comparing two sheets: lines, images, texts, limits, title, frame."""
+    return (
+        [(ln.get_gid(), ln.get_linestyle(), np.asarray(ln.get_xdata(), float).tobytes(),
+          np.asarray(ln.get_ydata(), float).tobytes()) for ln in ax.get_lines()],
+        [(np.asarray(im.get_array()).tobytes(), tuple(im.get_extent()), im.get_clim()) for im in ax.images],
+        [t.get_text() for t in ax.texts], ax.get_xlim(), ax.get_ylim(), ax.get_title(loc="left"),
+        to_hex(ax.spines["left"].get_edgecolor()), ax.get_subplotspec().colspan.start)
+
+
+def test_zoom():
+    """S7: the zoom row of amendment 1."""
+    z = 4.0
+    for theta in (0.0, 0.6):
+        view = make_view("far", theta=theta, invalid=(5,))
+        m = marks_of(view)
+        plain = sheet(view)
+        fig = sheet(view, zoom_half_um=z)
+        try:
+            assert len(fig.axes) == 68, len(fig.axes)
+            a_im, a_pr = fig.axes[0], fig.axes[1]
+            ss = a_im.get_subplotspec(), a_pr.get_subplotspec()
+            assert [(x.rowspan.start, x.colspan.start) for x in ss] == [(0, 0), (0, 1)]
+            assert all(ax.get_subplotspec().rowspan.start >= 1 for ax in fig.axes[2:])
+            assert a_im.get_title(loc="left") == "k* +0, zoomed", a_im.get_title(loc="left")
+            q_star = int(np.flatnonzero(view.ks == view.k_star)[0])
+            assert len(a_im.images) == 1
+            assert_array_equal(np.asarray(a_im.images[0].get_array()), view.stack[q_star])
+            # limits: exact arithmetic of the inputs, compared at float64 roundoff
+            check_close("S7 xlim", a_im.get_xlim(), (view.cx_um - z, view.cx_um + z), rtol=1e-15)
+            check_close("S7 ylim", a_im.get_ylim(), (view.cy_um + z, view.cy_um - z), rtol=1e-15)
+            assert a_im.get_ylim()[0] > a_im.get_ylim()[1]                       # y increases downwards
+            check_close("S7 vlim", a_pr.get_xlim(), (-z, z), rtol=0, atol=0)
+            (mk,) = lines(a_im, "allen_marks")
+            assert_array_equal(np.column_stack([mk.get_xdata(), mk.get_ydata()]), m["xy_um"])
+            av = lines(a_pr, "allen_v")
+            assert sorted(float(ln.get_xdata()[0]) for ln in av) == sorted(m["v_um"])
+            assert_array_equal(lines(a_pr, "profile")[0].get_ydata(), view.profile_gl[q_star])
+            assert_array_equal(lines(a_pr, "background")[0].get_ydata(), view.background_gl[q_star])
+            # the other 66 axes are as without the zoom
+            assert len(plain.axes) == 66
+            for k, (a, b) in enumerate(zip(fig.axes[2:], plain.axes)):
+                assert _axis_record(a) == _axis_record(b), "axes %d differs from the sheet without zoom" % k
+                assert a.get_subplotspec().rowspan.start == b.get_subplotspec().rowspan.start + 1
+            assert fig._suptitle.get_text() == plain._suptitle.get_text()
+        finally:
+            plt.close(fig)
+            plt.close(plain)
+    # near view: 16 axes, the zoom pair first
+    view = make_view("near")
+    fig = sheet(view, zoom_half_um=2.0)
+    try:
+        assert len(fig.axes) == 16 and fig.axes[0].get_title(loc="left") == "k* +0, zoomed"
+    finally:
+        plt.close(fig)
+
+
 def test_write_sheet():
     """S5: write_node_sheet writes a non-empty PNG and leaves no open figure."""
     keep = os.environ.get("SCREENING_SHEETS_DIR")
@@ -305,14 +365,14 @@ def test_write_sheet():
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(keep) if keep else Path(tmp)
         out.mkdir(parents=True, exist_ok=True)
-        for which in ("near", "far"):
+        for which, zoom in (("near", None), ("far", None), ("far", 4.0)):
             st = None
             if which == "far":
                 st = ["ok"] * 33
                 st[2] = "iter_max_rounds"
             view = make_view(which, invalid=(0,) if which == "far" else (), statuses=st)
-            path = out / ("%s_%d.png" % (which, view.node_id))
-            SF.write_node_sheet(view, marks_of(view), extent_of(view), DZ_UM, path, dpi=110)
+            path = out / ("%s_%d%s.png" % (which, view.node_id, "" if zoom is None else "_zoom"))
+            SF.write_node_sheet(view, marks_of(view), extent_of(view), DZ_UM, path, dpi=110, zoom_half_um=zoom)
             data = path.read_bytes()
             assert len(data) > 1000 and data[:8] == b"\x89PNG\r\n\x1a\n", (which, len(data))
             assert plt.get_fignums() == [], plt.get_fignums()

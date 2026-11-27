@@ -9,6 +9,8 @@ are display choices of the entry.
                     one y-range for all the node's planes. A near view as one pair per row (7 rows), a far view
                     as three pairs per row (11 rows), row-major. On the plane k* only: Allen's diameter as two
                     marks on the image and two vertical lines on the profile, and an orange frame.
+                    With zoom_half_um (amendment 1) the sheet opens with one more row: the plane k*
+                    again, image and profile limited to +-zoom_half_um about the pilot's centre, with the marks.
   write_node_sheet  node_sheet saved as a PNG, the figure closed.
 
 Artists carry gids for the tests: "image", "not_fetched", "profile", "background", "allen_marks" (the image's
@@ -73,12 +75,13 @@ def _pair_title(k, k_star, dz_um, status):
     return text
 
 
-def node_sheet(view, marks, extent, dz_um, title=""):
+def node_sheet(view, marks, extent, dz_um, title="", zoom_half_um=None):
     """The Figure of one node (SPEC Block 62): one pair of panels per plane in the order of view.ks -- the image
     (shared grey scale, extent = (x0, x1, y0, y1) um from screening.image_extent) and the profile I_k(v) with the
     background dashed (shared y-range); a near view as 7 rows of one pair, a far view as 11 rows of three pairs;
-    Allen's diameter marks (marks = screening.diameter_marks(view)) on the plane k* only. ValueError when view.ks
-    does not contain view.k_star."""
+    Allen's diameter marks (marks = screening.diameter_marks(view)) on the plane k* only. zoom_half_um (amendment 1): one
+    more first row, the plane k* again limited to +-zoom_half_um about the pilot's centre, image and profile, with
+    the marks. ValueError when view.ks does not contain view.k_star."""
     ks = np.asarray(view.ks)
     k_star = int(view.k_star)
     hits = np.flatnonzero(ks == k_star)
@@ -86,6 +89,7 @@ def node_sheet(view, marks, extent, dz_um, title=""):
         raise ValueError("node %s: view.ks %s does not contain k_star %d" % (view.node_id, ks.tolist(), k_star))
     if view.set not in PAIRS_PER_ROW:
         raise ValueError("node %s: view.set must be 'near' or 'far', got %r" % (view.node_id, view.set))
+    zoom = None if zoom_half_um is None else float(zoom_half_um)
     q_star = int(hits[0])
     n = int(ks.size)
     stack = np.asarray(view.stack)
@@ -100,21 +104,9 @@ def node_sheet(view, marks, extent, dz_um, title=""):
     im_extent = (x0, x1, y_bot, y_top)                 # imshow(origin="upper"): row 0 at y_top
     xy = np.asarray(marks["xy_um"], dtype=np.float64)  # (2, 2): one row per point, (x, y) um
     v_marks = [float(t) for t in marks["v_um"]]
+    v_lim = (float(np.nanmin(v)), float(np.nanmax(v))) if v.size else None
 
-    per_row = PAIRS_PER_ROW[view.set]
-    n_rows = int(math.ceil(n / float(per_row)))
-    plt = _plt()
-    fig = plt.figure(figsize=(3.9 * per_row + 0.6, 1.75 * n_rows + 0.9), facecolor=SURFACE)
-    gs = fig.add_gridspec(n_rows, 2 * per_row, width_ratios=[1.0, 1.45] * per_row,
-                          left=0.07 if per_row == 1 else 0.035, right=0.985,
-                          top=1.0 - 0.75 / (1.75 * n_rows + 0.9), bottom=0.45 / (1.75 * n_rows + 0.9),
-                          wspace=0.32, hspace=0.62)
-    for q in range(n):
-        r, c = divmod(q, per_row)
-        a_im = fig.add_subplot(gs[r, 2 * c])
-        a_pr = fig.add_subplot(gs[r, 2 * c + 1])
-        star = q == q_star
-        # image
+    def draw_pair(a_im, a_pr, q, label, star, xlim, ylim_img, vlim, xlabel, ylabel):
         if valid[q]:
             a_im.imshow(stack[q], cmap="gray", vmin=lo, vmax=hi, extent=im_extent, origin="upper",
                         interpolation="nearest").set_gid("image")
@@ -122,24 +114,23 @@ def node_sheet(view, marks, extent, dz_um, title=""):
             a_im.set_facecolor("#efeeea")
             a_im.text(0.5, 0.5, "not fetched", transform=a_im.transAxes, ha="center", va="center",
                       fontsize=8, color=INK2, gid="not_fetched")
-        a_im.set_xlim(x0, x1)
-        a_im.set_ylim(y_bot, y_top)
+        a_im.set_xlim(*xlim)
+        a_im.set_ylim(*ylim_img)
         a_im.set_aspect("equal")
         a_im.tick_params(colors=INK2, labelsize=6)
-        # profile
         _style_profile(a_pr)
         a_pr.plot(v, profile[q], color=BLUE, lw=1.1, ls="-", gid="profile")
         a_pr.plot(v, background[q], color=INK2, lw=0.9, ls="--", gid="background")
         a_pr.set_ylim(y_lo, y_hi)
-        if v.size:
-            a_pr.set_xlim(float(np.nanmin(v)), float(np.nanmax(v)))
-        if r == n_rows - 1 or q + per_row >= n:
+        if vlim is not None:
+            a_pr.set_xlim(*vlim)
+        if xlabel:
             a_pr.set_xlabel("v (um)", fontsize=7, color=INK2)
-        if c == 0:
+        if ylabel:
             a_pr.set_ylabel("I (gl)", fontsize=7, color=INK2)
         # the pair's title, over the image, left-aligned, running over the profile panel
-        a_im.set_title(_pair_title(ks[q], k_star, dz_um, view.status[q]), loc="left", fontsize=8,
-                       color=ORANGE if star else INK, fontweight="bold" if star else "normal")
+        a_im.set_title(label, loc="left", fontsize=8, color=ORANGE if star else INK,
+                       fontweight="bold" if star else "normal")
         if star:
             a_im.plot(xy[:, 0], xy[:, 1], ls="none", marker="o", ms=5, mfc="none", mec=ORANGE, mew=1.4,
                       gid="allen_marks")
@@ -150,17 +141,37 @@ def node_sheet(view, marks, extent, dz_um, title=""):
                     ax.spines[side].set_visible(True)
                     ax.spines[side].set_color(ORANGE)
                     ax.spines[side].set_linewidth(1.8)
+
+    per_row = PAIRS_PER_ROW[view.set]
+    n_rows = int(math.ceil(n / float(per_row)))
+    r0 = 0 if zoom is None else 1                      # the zoom row comes first
+    rows = n_rows + r0
+    height = 1.75 * rows + 0.9
+    plt = _plt()
+    fig = plt.figure(figsize=(3.9 * per_row + 0.6, height), facecolor=SURFACE)
+    gs = fig.add_gridspec(rows, 2 * per_row, width_ratios=[1.0, 1.45] * per_row,
+                          left=0.07 if per_row == 1 else 0.035, right=0.985,
+                          top=1.0 - 0.75 / height, bottom=0.45 / height, wspace=0.32, hspace=0.62)
+    if zoom is not None:
+        cx, cy = float(view.cx_um), float(view.cy_um)
+        draw_pair(fig.add_subplot(gs[0, 0]), fig.add_subplot(gs[0, 1]), q_star, "k* +0, zoomed", True,
+                  (cx - zoom, cx + zoom), (cy + zoom, cy - zoom), (-zoom, zoom), True, True)
+    for q in range(n):
+        r, c = divmod(q, per_row)
+        draw_pair(fig.add_subplot(gs[r0 + r, 2 * c]), fig.add_subplot(gs[r0 + r, 2 * c + 1]), q,
+                  _pair_title(ks[q], k_star, dz_um, view.status[q]), q == q_star, (x0, x1), (y_bot, y_top),
+                  v_lim, r == n_rows - 1 or q + per_row >= n, c == 0)
     if not title:
         title = "cell %s, node %s (%s), Allen's diameter %.3g um" % (view.cell_id, view.node_id, view.set,
                                                                      float(view.allen_diameter_um))
-    fig.suptitle(title, fontsize=10, color=INK, y=1.0 - 0.2 / (1.75 * n_rows + 0.9), va="top")
+    fig.suptitle(title, fontsize=10, color=INK, y=1.0 - 0.2 / height, va="top")
     return fig
 
 
-def write_node_sheet(view, marks, extent, dz_um, path, dpi, title="") -> None:
+def write_node_sheet(view, marks, extent, dz_um, path, dpi, title="", zoom_half_um=None) -> None:
     """node_sheet saved to path (PNG) at dpi, the figure closed."""
     plt = _plt()
-    fig = node_sheet(view, marks, extent, dz_um, title=title)
+    fig = node_sheet(view, marks, extent, dz_um, title=title, zoom_half_um=zoom_half_um)
     try:
         fig.savefig(str(path), dpi=dpi, format="png", facecolor=fig.get_facecolor())
     finally:
