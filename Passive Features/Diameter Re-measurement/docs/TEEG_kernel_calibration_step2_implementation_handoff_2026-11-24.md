@@ -4,10 +4,12 @@
 |---|---|
 | 2026-11-24 | Created at the user's request (16:36) for the chat that implements step 2 of the defocus kernel's calibration. Written on `sci/diameter-pipeline` at `7b4a9ab` (this file's commit follows it); decision log on `main` at `44b6e6a`. Nothing of step 2 is built (section 3). The defocus-table chat wrote no step-2 code; its study of step 2 is the T10 document (section 4.1), which is not in the repository, so sections 4 and 7 restate what the implementation needs from it. |
 | 2026-11-24 (later) | Pushed at `786977b`, rebased onto `9c7e8bb`: the commits in between (Block 44 amendment 4, D-239) do not touch step 2's code, but they moved SPEC s.8, so its line numbers are dropped here. The log on `main` at `c7822ad`: D-174 and D-178 marked implemented (section 5); D-240 (the soma fit holds the far slope, uncalibrated) added to section 5 as a consumer of step 2's $\gamma$; next free IDs D-241, I-007. |
+| 2026-11-27 | **D-261** [user] settles Q1: the user chooses the calibration nodes from the davinci export (the image at focus shows Allen's diameter) on its agreement with the image and on clean backgrounds; no diameter is set by eye (D-226.4 withdrawn); the chosen nodes go to steps 1 and 2 (D-230's order unchanged), and step 2's twins carry Allen's diameter as the true one: form B with the diameters held. Q4 gains a toy result of 2026-11-27: form B with every twin's depth fitted, started from the configured table and nothing from step 1, recovered the table and the depths on the faint toy and on the hybrid toy. Blocks 50 and 51 now exist in SPEC (wave 8). Log on `main` at `69fc18e`; next free IDs D-262, I-008. Branch at `e019d12` before this row. |
 
 **Status [2026-11-24]:** not started. D-228 to D-230 fix the estimator (form B, on core widths), its trial table and
 its order. The twins' settings -- diameter, absorption, axis depth -- and their forward model are open (section 9) and
-come before any logic.
+come before any logic. [updated 2026-11-27: the diameter is settled by D-261, Allen's taken as true; absorption, depth
+and the forward model stay open.]
 
 Basis tags: **[user]** said or decided by the user; **[log]** the decision log on `main`
 (`docs/project/TEEG_decisions_and_ideas_log.md`, read at `44b6e6a`); **[src]** read on 2026-11-24 in the named file at
@@ -21,7 +23,7 @@ Paths are relative to `Passive Features/Diameter Re-measurement/`, except those 
 ## 1. First actions in the next chat
 
 1. Read this file; then, in the log on `main`, by ID: D-165, D-172, D-175, D-178, D-181, D-201, D-221, D-226 to D-231,
-   I-006. Read the changelog's last rows again before taking an ID (several chats log there); at `c7822ad` the newest
+   D-261, I-006. Read the changelog's last rows again before taking an ID (several chats log there); at `c7822ad` the newest
    row gives the next free IDs as D-241 and I-007.
 2. Ask the user:
    - whether D-231's code has reached `origin`: `git log origin/sci/diameter-pipeline --oneline --grep "D-231"`. At
@@ -212,13 +214,14 @@ table too, since it is computed by the same renderer **[doc, Likely]**. H2 is th
 | D-178 | The first stage (the pilot fit) holds $d$ at Allen's diameter (twice the traced radius) and fits $\mu$ and the lateral centre. Twins built from the pilot record are therefore rendered at Allen's $d$ unless section 9 decides otherwise. In code since `513ad9e` (`measure.pilot_diameter` = "allen") **[src]** | active |
 | D-181 | The renderer should read the near-field table between knots with step 1's cubic spline. Not built: `model/kernel.py::sigma_r` reads it by `np.interp`, linear in $\lvert\delta\rvert$ **[src]** | active; not built |
 | D-201 | Block 42 fits $\sigma_0$ and a growth scale $c$ on thick nodes with the hybrid line renderer (`scripts/calibrate_sigma.py`) | active |
-| D-226 | The user chooses the calibration nodes from per-node images of the passive + I_h fit's cells (in the assistant's reading the 18 L3_exc cells, PROVISIONAL) and sets by-eye diameters $d^{\rm eye}_i$ in Colab. What $d^{\rm eye}_i$ is used for is open | active; not built |
+| D-226 | The user chooses the calibration nodes from per-node images of the passive + I_h fit's cells (in the assistant's reading the 18 L3_exc cells, PROVISIONAL) and sets by-eye diameters $d^{\rm eye}_i$ in Colab. What $d^{\rm eye}_i$ is used for is open [updated 2026-11-27: the by-eye diameter is withdrawn by D-261] | active; superseded in part by D-261 |
 | D-227 | Beside each plane's image, the profile along the measuring line | active; not built |
 | D-228 | $\theta = (\theta_1, \theta_2, \theta_3, \gamma)$, with $\sigma_{\rm r}(0)$ held; the far-set twins fix $\gamma$ | active; not built |
 | D-229 | Form B on core widths for near and far twins; planes weighted by distance from focus; the far nodes' $\pm 3$ planes kept for validation; $\gamma$ always fitted | active; not built |
 | D-230 | Near stage, then far stage; D-230.3's alternation PROVISIONAL | active; not built |
 | D-231 | The hybrid is the renderer's default absorption. Implemented at `2812d4d` in the defocus-table chat's sandbox; not on `origin` (section 8, item 1) | active |
-| I-006 | Form P | idea |
+| I-006 | Form P | idea; not used in step 2 under D-261 |
+| D-261 | The user chooses the calibration nodes from the davinci export, whose image at focus shows Allen's diameter, on its agreement with the image and on clean backgrounds across planes; no diameter by eye; the chosen nodes go to steps 1 and 2; **step 2's twins carry Allen's diameter as the true one**, $\tilde d_i = D_{{\rm A},i}$: form B with the diameters held, forms C and P not used | active; not built |
 | D-240 | Not binding on step 2: the soma fit (Block 46) holds the far slope at the configured 0.79, which the entry calls uncalibrated. A calibrated $\gamma$ from step 2 is a candidate for it **[reasoning]** | active |
 
 The log's status lines of D-174 and D-178 said "not implemented" although the changelog row of 2026-11-18 (later, 25)
@@ -412,7 +415,9 @@ Order of magnitude for near-set twins of about 0.5 um: about 1.75 $N$ core-hours
 - **(c) Diameter.** The diameter is the setting that decides step 2 most. A 20 % error costs form B about as much as
   skipping step 2 (7.2). Form C hands a wrong $\sigma_{\rm r}(0)$ to the diameters (7.2, last row), and its misfit is
   probably too small to reveal it **[doc, Guessing]**. Step 2 makes the table right given the diameters, or the
-  diameters right given $\sigma_{\rm r}(0)$; from core widths alone it cannot do both.
+  diameters right given $\sigma_{\rm r}(0)$; from core widths alone it cannot do both. [2026-11-27: D-261 takes Allen's
+  diameters as true and guards them by the user's choice of nodes whose Allen's diameter agrees with the image at
+  focus; the residual risk is how fine that visual agreement is, not measured.]
 - **(d) Slope.** $\gamma$ needs the far twins (7.4).
 
 ## 8. Pitfalls for the implementation [src at `7b4a9ab`; reasoning]
@@ -457,10 +462,10 @@ Order of magnitude for near-set twins of about 0.5 um: about 1.75 $N$ core-hours
 
 | Q | Question | Options and evidence |
 |---|---|---|
-| Q1 | The twins' diameter $\tilde d_i$ | Allen's ($D_{\rm A}$, the pilot record's since D-178); the by-eye $d^{\rm eye}_i$ (D-226, not built); the per-node fit's $\hat d$ (Block 30, under the configured kernel); free (form C); on a leash (form P, I-006: which $d^{\rm ref}_i$, which $\varrho_i$). Evidence in 7.2 and 7.6 (c) |
+| Q1 | The twins' diameter $\tilde d_i$ | **Settled by D-261 (2026-11-27): Allen's diameter, taken as the true one; form B with the diameters held.** The options were: Allen's ($D_{\rm A}$, the pilot record's since D-178); the by-eye $d^{\rm eye}_i$ (D-226, not built); the per-node fit's $\hat d$ (Block 30, under the configured kernel); free (form C); on a leash (form P, I-006: which $d^{\rm ref}_i$, which $\varrho_i$). Evidence in 7.2 and 7.6 (c) |
 | Q2 | $\sigma_{\rm r}(0)$ in step 2 | Held at 0.080 um (D-221.1's default) or Block 42's calibrated width (the switch). This decides whether forms C and P hand $\sigma_{\rm r}(0)$'s error to the diameters (7.2, last row) |
 | Q3 | The twins' $\mu_i$ | The pilot's partition-model $\hat\mu$ (7.6 b); the per-node fit under the hybrid (Block 30 via `infer_nodes.py`: `mu_hat_per_um`, `z_ax_hat_um`; it needs the cleaning run and uses the configured kernel, so step 2 would sit inside an outer iteration); a hybrid one-plane fit; or $\mu_i$ fitted per twin in step 2 |
-| Q4 | The twins' axis depth | Step 1's $\hat z_{{\rm ax},i}$ as is (costs -5.4, +4.5, -3.1 %, 7.3); fitted per twin in step 2; or corrected by the blend's centroid (7.6 a) |
+| Q4 | The twins' axis depth | Step 1's $\hat z_{{\rm ax},i}$ as is (costs -5.4, +4.5, -3.1 %, 7.3); fitted per twin in step 2; or corrected by the blend's centroid (7.6 a). On 2026-11-27, form B with every twin's depth fitted (30 extra unknowns, sparse Jacobian), started from the configured ideal-Debye table and every depth at the nearest plane, recovered the table and the depths on the faint toy (both ranges, every start) and on the hybrid toy (check 19's truth; 270 evaluations including the Jacobian's) **[run, sandbox: `check_step2_without_step1.py`, `check_step2_without_step1_hybrid.py`, in the defocus-table chat]** |
 | Q5 | The forward model | The full stack (`synthetic_block`, then `plane_scan` / `far_plane_scan`; the procedure's "full camera chain, same profile extraction"; 89.3 s per near phantom under the hybrid) or the fast line renderer (Block 35) with `dip_statistics` / `far_plane_statistics` (no 2-D background and no camera chain; its speed for this use not measured) **[open]** |
 | Q6 | Noise in the twins | Noise-free, which gives a deterministic objective; or the camera chain's noise with common random numbers (a fixed seed per twin across $\theta$). The core fit's low-signal effects at faint far planes enter the real core widths and only noisy twins (doc s.3.6) |
 | Q7 | The weights $\varpi$ | Open in D-229: their form and direction (e.g. the inverse of each plane's core-width noise variance); whether $k^*$ enters; the weight of far against near twins |
@@ -473,12 +478,12 @@ Order of magnitude for near-set twins of about 0.5 um: about 1.75 $N$ core-hours
 
 ## 10. A block breakdown (proposal, to agree with the user)
 
-Each block, once agreed, gets a SPEC entry and joins the roadmap under NS1. At writing, the last SPEC block was 49;
-take the next free number when the entries are written, since another chat may have added blocks.
+Each block, once agreed, gets a SPEC entry and joins the roadmap under NS1. At writing, the last SPEC block was 49
+[updated 2026-11-27: Blocks 50 and 51 now exist, wave 8]; take the next free number when the entries are written, since another chat may have added blocks.
 
 | Block | Module(s) | Delivers |
 |---|---|---|
-| Twin settings | `analysis/step2_twins.py` | $\xi_i$ per node, from the scans file's `nodes` and `PlaneScan`s, step 1's (or the far fit's) depths, and, when built, the user's chosen nodes and diameters. Q1 to Q4 become config fields |
+| Twin settings | `analysis/step2_twins.py` | $\xi_i$ per node, from the scans file's `nodes` and `PlaneScan`s, step 1's (or the far fit's) depths, and, when built, the user's list of chosen nodes. $\tilde d_i$ is the node record's `allen_diameter_um` (D-261). Q2 to Q4 become config fields |
 | Twin forward model | `analysis/step2_forward.py` | $\omega^{\rm sim}_{i,k}(\theta;\xi_i)$ for all twins: $\theta$ -> `RendererConfig` (section 8, item 3); render (Q5); measure with the frozen scan configuration (section 8, item 2); parallel over twins |
 | Estimator | `analysis/step2_fit.py` | Eq. (3) with $\varpi$ and the bounds; optional per-twin unknowns (depth, diameter, $\mu$); forms C and P as options; returns $\hat\theta$, cond $J$, the residuals by node and plane, and the per-twin fitted settings |
 | Stages and loop | same, or `analysis/step2_stages.py` | D-230: near stage, far stage, the alternation with its stop rule. Writes the production kernel in the `calibration_<S>.json` / `far_fit_<S>.json` format Cell 16 reads |
