@@ -328,6 +328,7 @@ the "Binds" column.
 | 2026-11-27 (the step-2 implementation chat, evening) | Logs **D-275** [orchestrator] (coding directive 7): the choices of step 2's contract -- the spline as the table family `gaussian_table_spline` with the continuation `tangent` (no new renderer field, hashes unchanged), its growth floored at zero (PROVISIONAL), the node list's CSV format, the split's allocation, the twins' camera settings, the estimator's two covariances. Block 4's amendment 4 implemented and smoke-tested; Blocks 52 to 56 drafted and added to the roadmap under NS1 (`needs_hpc: true`). Next free IDs: D-276, I-008. |
 | 2026-11-27 (the step-2 implementation chat, evening, 2) | Logs **D-276** [orchestrator] (coding directive 7): amendment 1 of step 2's wave (`5962ca3` on `sci/diameter-pipeline`) -- the twin carries the pilot's `B_bar`, `d_hat_um` and `alpha_hat` for the scan's stripe support; a capped cell's validation seat is passed on; the estimator's Jacobian is a structured difference with absolute steps (scipy's `diff_step` is relative to the iterate). Next free IDs: D-277, I-008. |
 | 2026-11-27 (the step-2 implementation chat, night) | Logs **D-277** [orchestrator] (coding directive 7): Blocks 52 to 56 merged on `sci/diameter-pipeline` (`a67b4df`); the independent check (report `specs/test_reports/2026-11-27_1904_incremental.md`, PASS WITH ISSUES) settled -- the twin's scan without the goodness-of-fit screen; four smoke suites broken by `far_min_k_offset` = 4 being fixed; the oracle of Block 55 split (amendment 2); D-275.2's figures corrected (0.138 um, -6.07e-4 um$^2$ at 0.092 um); amendment 3 (`98df4b0`). D-275 annotated. Next free IDs: D-278, I-008. |
+| 2026-11-27 (the step-2 implementation chat, 22:45) | Logs **D-278** (user): the davinci screening export of D-226, D-227 and D-261 is built by the step-2 implementation chat, as the log describes it (SPEC Blocks 61 and 62, a step `screening` in the per-cell array); the independent check's spec tests are committed. The fixes of D-277 are merged (`fea7cbf` on `sci/diameter-pipeline`); a second independent check runs. Next free IDs: D-279, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -593,6 +594,7 @@ would be needed*, *Status*.
 | D-275 | 2026-11-27 | SPEC section 5 'Kernel calibration, step 2' on `sci/diameter-pipeline`: Block 4 amendment 4, `Step2Config`, Blocks 52 to 56; D-181, D-265, D-270 to D-274 | the contract's choices: the spline as a table family (no new field, hashes unchanged), its growth floored at zero (PROVISIONAL), the node list as a CSV, the split's allocation, the twins' camera settings, the clustered and classical covariances [orchestrator] | active; amendment implemented, blocks drafted |
 | D-276 | 2026-11-27 | SPEC Blocks 53 to 56 on `sci/diameter-pipeline` (amendment 1, `5962ca3`); D-270, D-273.3, D-274.4 | the twin's scan node is the real pilot's in every attribute (`B_bar`, `d_hat_um`, `alpha_hat` added to the twin); a capped cell's validation seat is passed on; the estimator's Jacobian takes absolute steps through a callable [orchestrator] | active |
 | D-277 | 2026-11-27 | SPEC Blocks 52 to 56, Block 4 amendment 4, Block 15 amendment on `sci/diameter-pipeline` (amendments 2 and 3); the report of 2026-11-27_1904; D-273.2, D-275, D-276 | the final check of step 2's wave 1 settled: a twin is scanned without the goodness-of-fit screen; the smoke suites follow `far_min_k_offset` = 4; Block 55's oracle split; D-275.2's figures corrected [orchestrator] | active; fixes with their implementers |
+| D-278 | 2026-11-27 | D-226's screening export on davinci (D-226.1-3, D-227.1, D-261.1); the spec tests of step 2's first check | the screening export is built by the step-2 implementation chat as the log describes it, on the 18 L3_exc cells; the selection returns as the CSV of D-275.3; the spec tests are committed [user] | active; not built |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16879,3 +16881,43 @@ spline's root and minimum by `brentq` and `minimize_scalar`; Block 55's smoke te
 D-276.
 
 **Status:** active; the contract amended (`98df4b0`); the fixes with their implementers.
+
+---
+
+## D-278 -- The davinci screening export of D-226, D-227 and D-261 is built in the step-2 implementation chat, as the log describes it; what is ready is committed (user)
+
+**Date:** 2026-11-27, 22:45 (Europe/Rome), the step-2 implementation chat. **Binds:** D-226's screening export on
+davinci (D-226.1 to D-226.3, D-227.1, D-261.1; not built), the chat that builds it; the spec tests of the independent
+check of step 2's wave 1 (`specs/test_reports/2026-11-27_1904_incremental.md`).
+
+**Decision [user].** Asked who builds the davinci screening run that exports the apt nodes' images for the user's
+selection: "Yes it was in the decision log, absolutely implement it as described in the log." And: "commit everything
+that is ready".
+
+**Statement.** (D-278.1) The screening export is built by the step-2 implementation chat and joins its plan, with the
+content the log fixes: for every apt calibration node of a cell, the image at focus and the planes of D-226.3
+($k^* \pm 1, \pm 2, \pm 3$ for a near-set node; $k^* \pm 1$ to $\pm 16$ for a far-set node), each beside its intensity
+profile along the measuring line (D-227.1), the image at focus showing Allen's diameter (D-261.1); the cells are
+those of the passive + I_h fit, the 18 L3_exc cells (D-226.2's reading, D-124.2) [user]. The readings the log marks
+PROVISIONAL are taken as written: the profile in raw grey levels against the position along the line with the scan's
+fitted background marked (D-227.1); Allen's diameter as two marks at $\pm D_{{\rm A},i}/2$ from the line's centre, on
+the image and on the profile (D-261.1); every far plane shown (D-226's open point) [the orchestrator's reading of
+"as described in the log"]. (D-278.2) The user's selection comes back in the CSV format of D-275.3
+(`specimen_id,node_id`); the export also writes, per cell, that file with every apt node, to be cut down by the user
+[orchestrator]. (D-278.3) The spec tests of the independent check are committed with the branch [user].
+
+**Why.** **[user]**. The export gates the user's choice of nodes (D-261.2), and through it step 2's real run.
+
+**What it implies for code and tables.** A step `screening` in the per-cell davinci array (`scripts/survey_cells.py`,
+`scripts/pbs/survey_cells.pbs`) after the calibration scans, on a selection of the 18 cells with the cap on scans per
+cell lifted; a figure module and a small analysis module (SPEC Blocks 61 and 62); the scans file's `meta` gains the
+full configuration (`config`), which Block 52's reader needs and the survey's step did not write **[src:
+`survey_cells.step_calibration`]**. Not built.
+
+**What it does not decide.** The image crops' half-width and the sheets' layout (the orchestrator's, in SPEC); the
+minimum number of chosen nodes per cell.
+
+**Sources.** **[user]** 2026-11-27, 22:45. **[log]** D-124, D-226, D-227, D-261, D-275. **[src]**
+`scripts/survey_cells.py` on `sci/diameter-pipeline` at `fea7cbf`.
+
+**Status:** active; not built.
