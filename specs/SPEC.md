@@ -2499,6 +2499,15 @@ completed against what wave 1 returns, before wave 2 starts). Everything here is
   width at offset $j$ estimated from the twins' noise replicates (Block 59); `weights` = "none" gives $\varpi \equiv 1$.
 - Bounds (D-273.3): $\sigma_{\rm r}(0)$ + `knot_min_margin_um` $\le \theta_m \le$ `knot_max_um`; $\gamma \ge 0$;
   $|z_{{\rm ax},i} - z_{{\rm sub},i}| \le$ `z_ax_bound_um`, $z_{{\rm sub},i}$ the pilot's sub-plane depth, the start.
+- Known properties of the trial table (the independent checks of 2026-11-27): the not-a-knot spline is global, so
+  $\theta_3$ also moves $\sigma_{\rm r}$ inside [0, 0.28] um (a 0.4 um tube's focus plane moves by 7.5e-4 in transmittance
+  for $\theta_3$ + 0.02 um, by 4.8e-3 for + 0.1 um) **[run]**; and the floor of amendment 4 puts a kink in the
+  objective where the spline of $G$ crosses zero. Both are for wave 2's smoothness check.
+- The noise mapping is NOT yet the one D-270.2 asks for (the second check's N2, rerun by the orchestrator): on the
+  default camera (8 bit, JPEG) an SD put in of up to 1.2 gl is measured by the scan as 0, 1.5 to 3 gl as 1.43 to
+  1.55 gl, 5 gl as 4.41 gl **[run: `tests/spec/repro_noise_sd_mapping.py`]**. With `noise_scale` = 1 a real plane
+  measured at 1 gl therefore gets a noise-free twin. Wave 2 replaces the scale by the inverse of this response
+  (the SD to put in so that the twin's scan reads the real plane's SD), measured on the camera chain in use.
 - Training and validation (D-273.4, D-274.4): the chosen nodes are split by node, stratified by set and by cell,
   `validation_fraction` = 0.25 to validation; only training twins enter stages 1 and 3.
 - Frames and units. A twin lives in its real node's image frame: x, y in um from the full image's pixel centres, plane
@@ -2569,7 +2578,9 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
   - `save_step2(path, kernel, report, meta=None)`: JSON with `kernel` = `calibration_io.kernel_to_dict(kernel)` plus
     `kernel_family` (the keys notebook Cell 16 reads from `calibration_<S>.json` and `far_fit_<S>.json`), `step2`
     = `report` (written as given, except that a float that is not finite -- NaN, +-inf -- becomes null and numpy
-    scalars and arrays become Python numbers and lists; amendment 3) and `meta`. `load_step2(path) -> dict`.
+    scalars and arrays become Python numbers and lists; amendment 3) and `meta`. Dictionary keys are not converted:
+    a report with numpy-integer keys, or with integer and string keys mixed, raises TypeError (the second check's
+    N1; the callers of wave 2 pass string keys). `load_step2(path) -> dict`.
 - Parameters: none.
 - Library calls: `csv`, `json`; `calibration_io`; `config.config_from_dict`.
 - Custom code: none.
@@ -2695,7 +2706,7 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
     `calibration.plane_scan` for `twin.set` "near", `far_field.far_plane_scan` for "far", with `scan_cfg` whose
     `calibration.gof_check` is set to False (amendment 3: Block 10.G's goodness-of-fit screen is a quality filter
     of real planes; on a twin it switched planes on and off with the trial table and the noise replicate, and with
-    the noise off it rejects every plane; whether a plane enters the fit is the real scan's status, Block 53's
+    the noise off it rejects most planes (5 of 7 and 4 of 7 in the two checks' cases); whether a plane enters the fit is the real scan's status, Block 53's
     `fit_planes`). ValueError when `stack.ks` is not the scan's `stage_planes`.
   - `twin_statistics(twin, stack, scan_cfg, s2cfg, noise=True) -> dict` of (n,) arrays over `stack.ks`: over the
     $R$ = `noise_replicates` replicates (1 when `noise` is False), `omega_um2` the mean of the finite values, NaN
@@ -2731,7 +2742,7 @@ planes with $|k - k^*| \ge 4$ enter the far fit, as in step 2's far stage.
   real scan's support was built from the cell's trace and scene, neighbours and soma included, which the twin does
   not carry: the twin's background support approximates the real one. Passing the cell's own branch and scene to
   the twin's scan would make the supports equal; not built (it needs the morphology in step 2's inputs).
-- Status: implemented 2026-11-27 by one implementer (wave 9), merged `da0be67`; `test_smoke_step2_measure.py` 7 pass, 1 skip (amendments 1 and 2); awaiting the wave's final check.
+- Status: implemented 2026-11-27 by one implementer (wave 9), merged `da0be67`; `test_smoke_step2_measure.py` 8 pass, 1 skip (amendments 1 to 3); awaiting the wave's final check.
 
 ### Block 56: the estimator -- weighted least squares with shared and per-group unknowns (D-273.3)
 
