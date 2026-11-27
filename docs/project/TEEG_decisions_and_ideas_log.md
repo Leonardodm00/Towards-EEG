@@ -329,6 +329,7 @@ the "Binds" column.
 | 2026-11-27 (the step-2 implementation chat, evening, 2) | Logs **D-276** [orchestrator] (coding directive 7): amendment 1 of step 2's wave (`5962ca3` on `sci/diameter-pipeline`) -- the twin carries the pilot's `B_bar`, `d_hat_um` and `alpha_hat` for the scan's stripe support; a capped cell's validation seat is passed on; the estimator's Jacobian is a structured difference with absolute steps (scipy's `diff_step` is relative to the iterate). Next free IDs: D-277, I-008. |
 | 2026-11-27 (the step-2 implementation chat, night) | Logs **D-277** [orchestrator] (coding directive 7): Blocks 52 to 56 merged on `sci/diameter-pipeline` (`a67b4df`); the independent check (report `specs/test_reports/2026-11-27_1904_incremental.md`, PASS WITH ISSUES) settled -- the twin's scan without the goodness-of-fit screen; four smoke suites broken by `far_min_k_offset` = 4 being fixed; the oracle of Block 55 split (amendment 2); D-275.2's figures corrected (0.138 um, -6.07e-4 um$^2$ at 0.092 um); amendment 3 (`98df4b0`). D-275 annotated. Next free IDs: D-278, I-008. |
 | 2026-11-27 (the step-2 implementation chat, 22:45) | Logs **D-278** (user): the davinci screening export of D-226, D-227 and D-261 is built by the step-2 implementation chat, as the log describes it (SPEC Blocks 61 and 62, a step `screening` in the per-cell array); the independent check's spec tests are committed. The fixes of D-277 are merged (`fea7cbf` on `sci/diameter-pipeline`); a second independent check runs. Next free IDs: D-279, I-008. |
+| 2026-11-28 (the step-2 implementation chat, 00:30) | Logs **D-279** [orchestrator]: the screening export built and pushed (`70bc8a8` on `sci/diameter-pipeline`: SPEC Blocks 61 and 62, the step `screening`, the davinci run's commands in the davinci handoff's section 10; not run on real images); the second independent check of step 2's wave 1 (report `2026-11-27_2211`, PASS WITH ISSUES, no finding above NOTE) settled; the twins' noise SD does not map through the camera chain as D-275.5 assumed (0.5 to 1.2 gl in reads 0, 1.5 to 3 gl reads about 1.5 gl), for wave 2. The checks' spec tests committed (D-278.3). Next free IDs: D-280, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -595,6 +596,7 @@ would be needed*, *Status*.
 | D-276 | 2026-11-27 | SPEC Blocks 53 to 56 on `sci/diameter-pipeline` (amendment 1, `5962ca3`); D-270, D-273.3, D-274.4 | the twin's scan node is the real pilot's in every attribute (`B_bar`, `d_hat_um`, `alpha_hat` added to the twin); a capped cell's validation seat is passed on; the estimator's Jacobian takes absolute steps through a callable [orchestrator] | active |
 | D-277 | 2026-11-27 | SPEC Blocks 52 to 56, Block 4 amendment 4, Block 15 amendment on `sci/diameter-pipeline` (amendments 2 and 3); the report of 2026-11-27_1904; D-273.2, D-275, D-276 | the final check of step 2's wave 1 settled: a twin is scanned without the goodness-of-fit screen; the smoke suites follow `far_min_k_offset` = 4; Block 55's oracle split; D-275.2's figures corrected [orchestrator] | active; fixes with their implementers |
 | D-278 | 2026-11-27 | D-226's screening export on davinci (D-226.1-3, D-227.1, D-261.1); the spec tests of step 2's first check | the screening export is built by the step-2 implementation chat as the log describes it, on the 18 L3_exc cells; the selection returns as the CSV of D-275.3; the spec tests are committed [user] | active; not built |
+| D-279 | 2026-11-28 | SPEC 'The screening export' (Blocks 61, 62), `scripts/survey_cells.py` (the step `screening`), the davinci handoff's section 10; the report 2026-11-27_2211; D-270.2, D-275.5 | the export's build choices (the sheets' layout, crops of 4 and 11 um, a zoomed focus pair on far sheets, an opt-in step, the configuration in the scans file); step 2's second check settled; the twins' noise mapping is not yet D-270.2's and is rebuilt in wave 2 [orchestrator] | active; export built, not run on real images |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16920,4 +16922,56 @@ minimum number of chosen nodes per cell.
 **Sources.** **[user]** 2026-11-27, 22:45. **[log]** D-124, D-226, D-227, D-261, D-275. **[src]**
 `scripts/survey_cells.py` on `sci/diameter-pipeline` at `fea7cbf`.
 
-**Status:** active; not built.
+**Status:** active; not built. [2026-11-28: built and pushed, D-279; not run on real images]
+
+---
+
+## D-279 -- The screening export built (Blocks 61 and 62, the step `screening`); step 2's second check settled; the twins' noise mapping found not yet to be D-270.2's (orchestrator)
+
+**Date:** 2026-11-28, 00:30 (Europe/Rome), the step-2 implementation chat. **Binds:** SPEC section 5, "The screening
+export" (Blocks 61 and 62) and "Kernel calibration, step 2" on `sci/diameter-pipeline` (`70bc8a8`);
+`scripts/survey_cells.py` (the step `screening`; `step_calibration`'s `meta`); the davinci handoff's section 10
+(`Passive Features/Diameter Re-measurement/docs/TEEG_defocus_table_davinci_handoff_2026-11-18.md`); the report
+`specs/test_reports/2026-11-27_2211_incremental.md`; D-270.2, D-275.5, D-277, D-278.
+
+**Decision [orchestrator]** (coding directive 7): the build choices of D-278's export, and the settlement of the
+second independent check of step 2's wave 1 (an Opus agent; PASS WITH ISSUES at `fea7cbf`, no finding above NOTE).
+
+**Statement.** (D-279.1) *The export's build choices.* A node's sheet shows its planes as pairs, image left and
+profile right, 7 rows for a near-set node and 11 rows of three pairs for a far-set node; the image crops are +-4 um
+(near) and +-11 um (far) about the pilot's centre (`survey.screening_near_half_um`, `screening_far_half_um`;
+PROVISIONAL), 110 dpi. A far node's sheet opens with one more pair, the plane at focus zoomed to +-4 um: on the 22 um
+crop Allen's diameter appears as two marks that nearly touch, and the user's criterion is its agreement with the
+image at focus (D-261.2) **[seen on the implementer's sample sheets]**. The step `screening` runs only when named in
+the steps (`align,nodes,calibration,screening`); it fetches each apt node's crop again (the calibration scans do not
+keep their images) and takes the profiles from the scans file. `step_calibration` now writes the full configuration
+into the scans file's `meta["config"]`, which the survey's step did not and Block 52's reader needs **[src]**. The
+run on davinci: tag `screen1`, `configs/survey_screen1.json` (`calib_scans_per_cell` 100000, so that every apt node
+is scanned), the 18 cells picked by `cell_pool.py pick` from the ids under
+`/davinci-1/home/ldellamea/Human Neurons Fitting/L3_exc/specimen_*`. (D-279.2) *The second check.* Amendment 3's
+fixes hold (the four smoke suites, the twin's scan without the screen, `validate()`, `save_step2`, the split's
+count, the step inside its box); all 77 smoke suites pass; the 13 failing spec tests are the known ones, none from
+this work. Left as they are: `save_step2` does not convert dictionary keys (N1); one extra model call when a start
+lies on a bound (F8). (D-279.3) *The noise mapping is not yet D-270.2's* (the check's N2, rerun by the orchestrator):
+on the default camera (8 bit, JPEG) a noise SD put in of 0.5 to 1.2 gl is measured by the scan as 0, 1.5 to 3 gl as
+1.43 to 1.55 gl, 5 gl as 4.41 gl **[run: `tests/spec/repro_noise_sd_mapping.py`]**. D-275.5's `noise_scale` = 1 puts
+the real plane's measured SD in, so a real plane measured at 1 gl gets a noise-free twin. Wave 2 implements D-270.2's
+reading as written -- the SD to put in is the one for which the twin's scan reads the real plane's SD -- by inverting
+this response on the camera chain in use; where the real SD lies below what the chain can produce, the twin's noise
+is the chain's own (quantisation and JPEG).
+
+**Why.** As stated with each point.
+
+**What it implies for code and tables.** As in SPEC. The screening run's time per cell with the cap lifted is not
+measured: the probe on one cell (handoff section 10, step 5) gives it.
+
+**What it does not decide.** How the response's flat stretch (inputs of 1.5 to 3 gl all measuring about 1.5 gl) is
+inverted, and whether Allen's own JPEG tables change it: to measure in wave 2 and report. The crops' half-widths and
+the layout stay the user's to change.
+
+**Sources.** **[orchestrator]**; **[run]** the smoke suites on the merged tree (`test_smoke_s3b.py` 7 pass with
+`test_screening_export`; `test_smoke_screening.py` 5 pass; `test_smoke_screening_figures.py` 8 pass), the second
+check's report, the rerun of its reproduction; **[src]** `scripts/survey_cells.py`; **[log]** D-124, D-226, D-227,
+D-261, D-270, D-275, D-277, D-278.
+
+**Status:** active; the export built and pushed (`70bc8a8`), not run on real images; the noise mapping for wave 2.
