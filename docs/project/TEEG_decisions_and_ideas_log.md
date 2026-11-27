@@ -327,6 +327,7 @@ the "Binds" column.
 | 2026-11-27 (the step-2 implementation chat, 18:34) | Logs **D-274** (user): step 2's absorption held at the pilot's value (no area term; D-271.2 superseded); a far twin's depth fitted on its own near planes with the knots held; $\sigma_{\rm r}(0)$ held, a fit with it free compared on the validation set; the split by node, stratified, 75/25; davinci with at most 100 cores, NS1 `needs_hpc: true`; the staged plan approved (Block 4 amendment, Blocks 52 to 60). D-271 and D-273 annotated. Next free IDs: D-275, I-008. |
 | 2026-11-27 (the step-2 implementation chat, evening) | Logs **D-275** [orchestrator] (coding directive 7): the choices of step 2's contract -- the spline as the table family `gaussian_table_spline` with the continuation `tangent` (no new renderer field, hashes unchanged), its growth floored at zero (PROVISIONAL), the node list's CSV format, the split's allocation, the twins' camera settings, the estimator's two covariances. Block 4's amendment 4 implemented and smoke-tested; Blocks 52 to 56 drafted and added to the roadmap under NS1 (`needs_hpc: true`). Next free IDs: D-276, I-008. |
 | 2026-11-27 (the step-2 implementation chat, evening, 2) | Logs **D-276** [orchestrator] (coding directive 7): amendment 1 of step 2's wave (`5962ca3` on `sci/diameter-pipeline`) -- the twin carries the pilot's `B_bar`, `d_hat_um` and `alpha_hat` for the scan's stripe support; a capped cell's validation seat is passed on; the estimator's Jacobian is a structured difference with absolute steps (scipy's `diff_step` is relative to the iterate). Next free IDs: D-277, I-008. |
+| 2026-11-27 (the step-2 implementation chat, night) | Logs **D-277** [orchestrator] (coding directive 7): Blocks 52 to 56 merged on `sci/diameter-pipeline` (`a67b4df`); the independent check (report `specs/test_reports/2026-11-27_1904_incremental.md`, PASS WITH ISSUES) settled -- the twin's scan without the goodness-of-fit screen; four smoke suites broken by `far_min_k_offset` = 4 being fixed; the oracle of Block 55 split (amendment 2); D-275.2's figures corrected (0.138 um, -6.07e-4 um$^2$ at 0.092 um); amendment 3 (`98df4b0`). D-275 annotated. Next free IDs: D-278, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -591,6 +592,7 @@ would be needed*, *Status*.
 | D-274 | 2026-11-27 | step 2's absorption, the far twins' depth, $\sigma_{\rm r}(0)$, the split, the davinci run, the roadmap's NS1; D-271.2, D-273.6, D-229.2 | the absorption is held at the pilot's value for every twin; a far twin's depth is fitted on its own near planes with the knots held; $\sigma_{\rm r}(0)$ is held and a fit with it free is compared on the validation set; split by node 75/25; at most 100 cores; the plan approved [user] | active; not built |
 | D-275 | 2026-11-27 | SPEC section 5 'Kernel calibration, step 2' on `sci/diameter-pipeline`: Block 4 amendment 4, `Step2Config`, Blocks 52 to 56; D-181, D-265, D-270 to D-274 | the contract's choices: the spline as a table family (no new field, hashes unchanged), its growth floored at zero (PROVISIONAL), the node list as a CSV, the split's allocation, the twins' camera settings, the clustered and classical covariances [orchestrator] | active; amendment implemented, blocks drafted |
 | D-276 | 2026-11-27 | SPEC Blocks 53 to 56 on `sci/diameter-pipeline` (amendment 1, `5962ca3`); D-270, D-273.3, D-274.4 | the twin's scan node is the real pilot's in every attribute (`B_bar`, `d_hat_um`, `alpha_hat` added to the twin); a capped cell's validation seat is passed on; the estimator's Jacobian takes absolute steps through a callable [orchestrator] | active |
+| D-277 | 2026-11-27 | SPEC Blocks 52 to 56, Block 4 amendment 4, Block 15 amendment on `sci/diameter-pipeline` (amendments 2 and 3); the report of 2026-11-27_1904; D-273.2, D-275, D-276 | the final check of step 2's wave 1 settled: a twin is scanned without the goodness-of-fit screen; the smoke suites follow `far_min_k_offset` = 4; Block 55's oracle split; D-275.2's figures corrected [orchestrator] | active; fixes with their implementers |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16788,7 +16790,7 @@ a small-sample correction of the clustered SEs.
 `sci/diameter-pipeline`; **[run]** `tests/smoke/test_smoke_kernel_spline.py` (6 pass, 1 skip), `test_smoke_config.py`
 (6 pass); **[log]** D-181, D-231, D-265, D-270 to D-274.
 
-**Status:** active; the amendment implemented, Blocks 52 to 56 drafted.
+**Status:** active; the amendment implemented, Blocks 52 to 56 drafted. [corrected 2026-11-27 by D-277.4: the spline is negative for $|\delta| <$ 0.138 um, minimum -6.07e-4 um$^2$ at 0.092 um]
 
 ---
 
@@ -16827,3 +16829,53 @@ objective. The count of model calls per Jacobian is unchanged ($S + L$).
 implementers' reports of wave 1.
 
 **Status:** active; the contract amended (`5962ca3`).
+
+---
+
+## D-277 -- Step 2, the final check of wave 9 settled: the twin is scanned without the goodness-of-fit screen; four smoke suites follow the far fit's first plane; D-275's figures corrected (orchestrator)
+
+**Date:** 2026-11-27, night (Europe/Rome), the step-2 implementation chat. **Binds:** SPEC Blocks 52 to 56, Block 4's
+amendment 4 and Block 15's amendment on `sci/diameter-pipeline` (contract commits `4e58446`, amendment 2, and
+`98df4b0`, amendment 3); the tester's report `specs/test_reports/2026-11-27_1904_incremental.md` (an independent
+Opus agent; verdict PASS WITH ISSUES at `a67b4df`); D-273.2, D-275, D-276.
+
+**Decision [orchestrator]** (coding directive 7), on the findings of the independent check and on one issue of
+Block 55's implementer; the evidence of each was rerun by the orchestrator.
+
+**Statement.** (D-277.1, the check's F2) *A twin's scan does not apply Block 10.G's goodness-of-fit screen*
+(`calibration.gof_check` False for the twin's scan; everything else of the real scans' configuration unchanged).
+Agreed before: the twin is scanned "under the real scans' own configuration" (D-270.1), the screen included. Evidence:
+the screen rejects a plane whose core fit is poor against its background noise; on a twin it switched planes on and
+off with the trial table and the noise replicate (in the check's minimal case a twin lost its focus plane for a whole
+fit), and with the noise off it rejects every plane **[run by the tester and by Block 55's implementer]**. Whether a
+plane enters the fit stays the real scan's status. (D-277.2, F1) *`far_min_k_offset` = 4 (D-273.2) had broken four
+smoke suites* outside the wave (`calibration_by_cell`, `calibration_figures`, `candidate_search`, `isolation_view`:
+26 far planes where they expected 24) -- the orchestrator had rerun only the far field's suite; their expected values
+and the stale texts of SPEC Blocks 10 and 15 are brought to 4 (an implementer for the suites). (D-277.3, Block 55's
+issue; SPEC amendment 2) *The oracle of the twin's scan against the pipeline's own scan* is exact (1e-9 um$^2$) with
+the scan's own branch and 5e-4 um$^2$ with the twin's: the twin's branch runs along the pilot's fitted axis, the real
+one along the trace, so the background's support differs by a few pixels (6.3e-5 um$^2$ on one plane of seven) **[run]**.
+Known limit, recorded in SPEC: a twin is scanned with its own tube as the only traced structure, the real scan with
+the cell's trace, neighbours and soma. (D-277.4, S1) *D-275.2's figures corrected*: on the pilot table the spline of
+$G$ is negative for $|\delta| <$ 0.138 um with minimum -6.07e-4 um$^2$ at 0.092 um (D-275 gave 0.130, -6.06e-4 and
+0.090, read off a 0.01 um grid) **[run]**. (D-277.5, F3 to F7) `validate()` refuses "tangent" without the spline
+family, a spline on fewer than three knots, and a `Step2Config.kernel_family` other than the spline; `save_step2`
+writes non-finite floats as null and accepts numpy types; the validation count is `floor(f N + 0.5 + 1e-9)`; a
+finite-difference step stays inside a box narrower than itself.
+
+**Why.** As stated with each point. None changes the approach of D-270 to D-274.
+
+**What it implies for code and tables.** As in SPEC (amendments 2 and 3). A real plane is compared with a twin plane
+that was not screened: a second-order selection difference, accepted for a deterministic, smooth objective.
+
+**What it does not decide.** Raised by the check and left for wave 2 (S2): the spline is global, so $\theta_3$ also
+moves $\sigma_{\rm r}$ inside [0, 0.28] um, and the floor of D-275.2 puts a kink in the objective where the spline
+crosses zero -- whether the floor stays is the user's call (D-275), to be judged with wave 2's smoothness check.
+Pre-existing and outside this work (F9): seven spec tests of the soma fit (Blocks 46, 50, 51) fail at the base commit
+too.
+
+**Sources.** **[orchestrator]**; **[run]** the tester's report and the orchestrator's reruns (the four suites; the
+spline's root and minimum by `brentq` and `minimize_scalar`; Block 55's smoke test); **[log]** D-270, D-273, D-275,
+D-276.
+
+**Status:** active; the contract amended (`98df4b0`); the fixes with their implementers.
