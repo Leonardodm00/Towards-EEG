@@ -326,6 +326,7 @@ the "Binds" column.
 | 2026-11-27 (the step-2 implementation chat, 18:06) | Logs **D-270** to **D-273** (user), the answers to the open questions of kernel calibration step 2 (roadmap NS1; the step-2 implementation handoff's section 9): the full stack as the forward model, noisy twins plane by plane, the hybrid in steps 1 and 2 (D-270); each near twin's depth fitted and its absorption searched in the near stage, both held in the slope's fit (D-271; the absorption's statistic to confirm); the spline as the renderer's default between knots (D-272, makes D-181 effective); the weights, the far planes from the fourth in both fits, the solver, a training/validation split, the nodes' delivery (D-273; whether $\sigma_{\rm r}(0)$ is fitted is not decided). Check run: `checks/step2_identifiability_2026-11-27/` on `sci/diameter-pipeline`. D-181 and D-229 annotated. Next free IDs: D-274, I-008. |
 | 2026-11-27 (the step-2 implementation chat, 18:34) | Logs **D-274** (user): step 2's absorption held at the pilot's value (no area term; D-271.2 superseded); a far twin's depth fitted on its own near planes with the knots held; $\sigma_{\rm r}(0)$ held, a fit with it free compared on the validation set; the split by node, stratified, 75/25; davinci with at most 100 cores, NS1 `needs_hpc: true`; the staged plan approved (Block 4 amendment, Blocks 52 to 60). D-271 and D-273 annotated. Next free IDs: D-275, I-008. |
 | 2026-11-27 (the step-2 implementation chat, evening) | Logs **D-275** [orchestrator] (coding directive 7): the choices of step 2's contract -- the spline as the table family `gaussian_table_spline` with the continuation `tangent` (no new renderer field, hashes unchanged), its growth floored at zero (PROVISIONAL), the node list's CSV format, the split's allocation, the twins' camera settings, the estimator's two covariances. Block 4's amendment 4 implemented and smoke-tested; Blocks 52 to 56 drafted and added to the roadmap under NS1 (`needs_hpc: true`). Next free IDs: D-276, I-008. |
+| 2026-11-27 (the step-2 implementation chat, evening, 2) | Logs **D-276** [orchestrator] (coding directive 7): amendment 1 of step 2's wave (`5962ca3` on `sci/diameter-pipeline`) -- the twin carries the pilot's `B_bar`, `d_hat_um` and `alpha_hat` for the scan's stripe support; a capped cell's validation seat is passed on; the estimator's Jacobian is a structured difference with absolute steps (scipy's `diff_step` is relative to the iterate). Next free IDs: D-277, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -589,6 +590,7 @@ would be needed*, *Status*.
 | D-273 | 2026-11-27 | step 2's weights, far planes (`far_min_k_offset`), solver, acceptance and validation set, the nodes' delivery; D-221.1 | weights $1/s_\omega(j)^2$ with the unweighted fit selectable; far planes from the fourth in step 2 and in the far fit; `least_squares` with SEs clustered by node, no bootstrap for now; the chosen nodes split into training and validation; whether $\sigma_{\rm r}(0)$ is fitted is not decided [user] | active; D-273.6 to confirm; not built |
 | D-274 | 2026-11-27 | step 2's absorption, the far twins' depth, $\sigma_{\rm r}(0)$, the split, the davinci run, the roadmap's NS1; D-271.2, D-273.6, D-229.2 | the absorption is held at the pilot's value for every twin; a far twin's depth is fitted on its own near planes with the knots held; $\sigma_{\rm r}(0)$ is held and a fit with it free is compared on the validation set; split by node 75/25; at most 100 cores; the plan approved [user] | active; not built |
 | D-275 | 2026-11-27 | SPEC section 5 'Kernel calibration, step 2' on `sci/diameter-pipeline`: Block 4 amendment 4, `Step2Config`, Blocks 52 to 56; D-181, D-265, D-270 to D-274 | the contract's choices: the spline as a table family (no new field, hashes unchanged), its growth floored at zero (PROVISIONAL), the node list as a CSV, the split's allocation, the twins' camera settings, the clustered and classical covariances [orchestrator] | active; amendment implemented, blocks drafted |
+| D-276 | 2026-11-27 | SPEC Blocks 53 to 56 on `sci/diameter-pipeline` (amendment 1, `5962ca3`); D-270, D-273.3, D-274.4 | the twin's scan node is the real pilot's in every attribute (`B_bar`, `d_hat_um`, `alpha_hat` added to the twin); a capped cell's validation seat is passed on; the estimator's Jacobian takes absolute steps through a callable [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16787,3 +16789,41 @@ a small-sample correction of the clustered SEs.
 (6 pass); **[log]** D-181, D-231, D-265, D-270 to D-274.
 
 **Status:** active; the amendment implemented, Blocks 52 to 56 drafted.
+
+---
+
+## D-276 -- Step 2, amendment 1 of wave 9: the twin carries the pilot's values the scan's masks read; the split passes on a capped cell's seat; the estimator's Jacobian takes absolute steps (orchestrator)
+
+**Date:** 2026-11-27, evening (Europe/Rome), the step-2 implementation chat. **Binds:** SPEC Blocks 53, 54, 55 and 56 on
+`sci/diameter-pipeline` (contract commit `5962ca3`); D-270, D-273.3, D-274.4, D-275.
+
+**Decision [orchestrator]** (coding directive 7), on three issues the implementers of Blocks 53, 55 and 56 raised, each
+verified by the orchestrator.
+
+**Statement.** (D-276.1) *The twin's scan node is the real pilot's in every attribute.* `Twin` gains `B_pilot_gl`,
+`d_pilot_um` and `alpha_pilot` (the pilot record's `B_bar`, `d_hat_um`, `alpha_hat`); the node a twin is scanned with
+carries them and the pilot's `mu_hat_per_um`, so that the background's support of the twin's scan is the real scan's.
+Agreed before: a node with `d_hat_um` = Allen's diameter and no `B_bar`. Evidence: under `background_support` =
+"stripe" (the default, D-101.3) `calibration.support_masks` reads `node.B_bar`, `node.mu_hat_per_um` and
+`node.d_hat_um` **[src; run by the implementer: an AttributeError without them, 3080 support pixels changed on a
++-4 um patch when they are NaN]**. `build_twins` also refuses a scan whose `k_star` or `z_sub_um` differs from its
+pilot's. (D-276.2) *The split.* A validation seat that a cell at its cap cannot take goes to the next cell in the
+ranking, in repeated passes; seats are dropped only when every cell is at its cap. Agreed before: "what cannot be
+placed is dropped", which left three readings with different counts on the SPEC's own example **[the implementer's
+hand computation]**. (D-276.3) *The estimator's Jacobian* is a callable: a 2-point forward difference with absolute
+steps, one model call per shared unknown and one per local index (every twin's shifted at once), reversed at an upper
+bound, dense. Agreed before: scipy's `jac="2-point"` with `jac_sparsity` and `diff_step`. Evidence: in scipy 1.18.1
+`diff_step` is relative to the current iterate -- steps asked as 0.005, 0.02, 0.02 at the start were 0.014, 0.13,
+0.028 at the second iterate **[run, orchestrator]** -- and falls back to about 1.5e-8 at zero, useless on a quantised
+objective. The count of model calls per Jacobian is unchanged ($S + L$).
+
+**Why.** As stated with each point; none changes the approach of D-270 to D-274.
+
+**What it implies for code and tables.** As in SPEC (amendment 1). `Step2Config`'s `diff_step_*` are absolute steps.
+
+**What it does not decide.** The steps' values (PROVISIONAL, D-275.6).
+
+**Sources.** **[orchestrator]**; **[src]** `analysis/calibration.py` (`support_masks`); **[run]** as above; the
+implementers' reports of wave 1.
+
+**Status:** active; the contract amended (`5962ca3`).
