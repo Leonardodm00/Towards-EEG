@@ -484,8 +484,14 @@ def write_twin_archive(group_dir, spec: TwinSpec, traces: TwinTraces, *, swc_pat
 # ===========================================================================
 def build_twin(spec: TwinSpec, real_spec_dir, table: pd.DataFrame, group_dir, *, ih_spec, apply_theta,
                spike_reason_fn=None, cfg: TwinConfig = TwinConfig(), overwrite: bool = False,
-               provenance: Optional[Mapping] = None, with_noise: bool = True) -> Path:
-    """The whole build of one twin from its real cell's archive directory:
+               provenance: Optional[Mapping] = None, with_noise: bool = True,
+               sim_swc_path=None) -> Path:
+    """`sim_swc_path` (Block 29, SPEC 2.11; D-268): when given, the twin's
+    cell is built and simulated on THIS morphology, while the archive still
+    stores the real cell's reconstruction.swc (the one the fit reads).
+    None: both are the real cell's, as before.
+
+    The whole build of one twin from its real cell's archive directory:
     twin_table.load_cell_protocol (spike_reason_fn None ->
     passive_fitting_hpc_fixed.sweep_spike_reason), build_twin_cell on
     <real_spec_dir>/reconstruction.swc, simulate_twin, the features
@@ -517,7 +523,12 @@ def build_twin(spec: TwinSpec, real_spec_dir, table: pd.DataFrame, group_dir, *,
     with open(real_spec_dir / "metadata.json") as fh:
         real_meta = json.load(fh)
 
-    cell = build_twin_cell(swc, spec, ih_spec=ih_spec, apply_theta=apply_theta, cfg=cfg)
+    sim_swc = swc
+    if sim_swc_path is not None:
+        sim_swc = Path(sim_swc_path)
+        if not sim_swc.is_file():
+            raise TwinBuildError("twin %d: the simulation morphology %s not found" % (int(spec.twin_id), sim_swc))
+    cell = build_twin_cell(sim_swc, spec, ih_spec=ih_spec, apply_theta=apply_theta, cfg=cfg)
     traces = simulate_twin(cell, spec, protocol, table, cfg=cfg, with_noise=with_noise)
 
     import synthetic_ground_truth as sgt

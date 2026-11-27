@@ -52,6 +52,7 @@ Paths this spec covers (relative to `Passive Features/HPC script/Ih Fit/`):
 - `run_twin_recovery.py`, `submit_twin_recovery.sh`, `smoke_twin_recovery.py` (Block 8: the Stage-7 run; drafted 2026-11-20)
 - of the I_h fitter, the parts Blocks 14 to 22 specify [added 2026-11-24, the final check's S1]: `passive_long_step_training.py` (the roles, the weights and the worker pool: Blocks 14, 19), `run_ih_fit.py` and `param_spec.py` as far as Blocks 15 and 20 state them, `local_refine.py` (Block 20), `twin_manifest.py` (Blocks 13, 16, 21), `twin_build.py` (Blocks 12, 18), `ih_recovery_report.evaluate_gate`'s `required_axes` (Block 17), and the smoke suites `smoke_ls_protocol.py`, `smoke_ls_pool.py`, `smoke_ih5.py`, `smoke_local_refine.py`, `smoke_ih_refine.py`; the rest of the I_h fitter stays outside this spec
 - of the I_h fitter, the parts Blocks 23 to 28 specify [added 2026-11-25]: `passive_long_step_training.py` (the residual vector, the layout, the trace evaluator: Block 23), `smoke_residuals.py`; `fd_jacobian.py`, `smoke_fd_jacobian.py` (Block 24); `local_refine.py` (`TrfConfig`, `TrfResult`, `refine_trf`, `wrap_minimizer_trf`: Block 25), `smoke_refine_trf.py`; `identifiability.py`, `trace_sensitivity.py`, `smoke_identifiability.py` (Block 26); `run_ih_fit.py` (the `trf` refinement, the bound flags, the sensitivity mode, `layout_from_stored`: Block 27), `smoke_ih_trf.py`; `run_twin_recovery.py` (the `sensitivity` sub-command, the bundle noise, the merged tables), `submit_twin_recovery.sh` (`MODE=sensitivity`), `smoke_twin_sensitivity.py` (Block 28)
+- Block 29 [added 2026-11-27]: `morph_inflate.py`, `smoke_morph_inflate.py`; `twin_build.build_twin`'s `sim_swc_path`; `run_twin_recovery.py`'s `--twin-diam-factor`, `--twin-diam-max-path-um`, `twin_inflation`
 - (to be added block by block) [2026-11-12: the `sens_*.py` scripts dropped for now, D-125.3] the OU term of `synthetic_ground_truth.add_recording_noise`
 
 Everything else in `Ih Fit/` (the I_h fitter, the loader, the recovery gate,
@@ -1075,6 +1076,19 @@ $\delta q^{(k)} = -(J^\top J)^{-1} J^\top r_\eta^{(k)}$ (least-squares solution;
 deviation of $\hat q_i$ is the standard deviation of $\delta q_i^{(k)}$ over $k$ (ddof 1), and the predicted
 correlations those of $\delta q$. First order in the noise; the weights are held fixed; the box is ignored.
 
+### 2.11 Twins simulated on an inflated morphology, fitted on the original one (D-268)
+
+A test of what a wrong morphology does to the estimates. For a run planned with an inflation factor $f \ne 1$
+(the user's: $f = 1.5$) and a path length $\ell_{\max}$ (the user's: 300 um): each twin's traces are simulated on its
+real cell's reconstruction with the radius of every SOMA and DENDRITE node (SWC types 1, 3, 4; the axon, replaced
+by the stub anyway, is left alone) multiplied by $f$ when the node's path length from the soma's root node, along
+the tree (the sum of the Euclidean distances between consecutive nodes of the parent chain), is
+$\le \ell_{\max}$, and by 1 beyond (a hard step, at the resolution of the reconstruction's nodes). The truth
+$\theta$, the stimuli, the noise and every other step of the build are unchanged. The twin's archive stores the
+ORIGINAL reconstruction, so the fit (and the sensitivity mode) runs on the non-inflated morphology: the twin plays
+a real cell that is thicker near the soma than its reconstruction says. The recovery errors of such a run measure
+the bias a diameter error of that size puts into the fitted parameters; they are not a test of the optimiser.
+
 ## 3. Data contracts
 
 | Item | Source / format | Shape and axis order | dtype | Units | Conventions |
@@ -2073,6 +2087,53 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Confirmed: yes -- D-246; K = 200 shown to the user. The seeds, the averaging of sweep noise into a bundle and
   the file layout are the orchestrator's (D-247).
 - Status: smoke-tested 2026-11-25 (sandbox, NEURON 9: `smoke_twin_sensitivity.py` V1-V7 7/7 on the merged branch; `smoke_twin_recovery.py` 22 pass, 2 skip, after the adaptations the implementer lists; commit `07e9b76`, amendment 2 applied).
+
+### Block 29: twins simulated on an inflated morphology (2.11)
+
+- Purpose: 2.11: the plan option, the inflated copy of a reconstruction, the build on it, the record.
+- Module: `morph_inflate.py` (new; numpy only), `twin_build.py` (`build_twin(..., sim_swc_path=None)`),
+  `run_twin_recovery.py` (`plan --twin-diam-factor F --twin-diam-max-path-um L`, `twin_inflation`,
+  `build_if_needed`, `_archive_matches`); smoke `smoke_morph_inflate.py` (new). Written inline by the orchestrator.
+- Public API:
+  - `morph_inflate.read_swc(path) -> (rows (n, 7) float64, header)`; `path_length_from_root(rows) -> (n,)` um;
+    `inflate_swc(src, dst, *, factor, max_path_um, types=(1, 3, 4)) -> dict` (`n_nodes`, `n_inflated`,
+    `n_by_type`, `factor`, `max_path_um`): `dst` is `src` with radius * factor on the nodes of 2.11, everything
+    else copied, one comment line added, radii written with 10 significant digits. ValueError: factor not finite
+    and > 0; `max_path_um` not finite and >= 0; `dst` is `src`; a duplicated id, a parent that is not a node, a
+    cycle.
+  - `twin_build.build_twin(..., sim_swc_path=None)`: when given, the cell is built and simulated on that file;
+    `write_twin_archive` still receives the real cell's `reconstruction.swc`. TwinBuildError when the file is
+    missing.
+  - `run_twin_recovery.py plan`: `--twin-diam-factor` (1.0 = no inflation), `--twin-diam-max-path-um` (300; read
+    only when the factor is not 1). Recorded in `run_config.json`'s options ONLY when the factor is not 1 (so a
+    run planned before this block still compares equal to the same plan made now). Refused: factor not finite
+    and > 0, path not finite and >= 0.
+  - Build: with an inflation, `build_if_needed` writes `twins/twin_<ID>/sim_morphology_<ID>.swc` (the inflated
+    copy of the real cell's reconstruction), builds on it, and records
+    `twin.provenance.sim_morphology = {factor, max_path_um, n_nodes, n_inflated, file}` in the archive's
+    `metadata.json`. An existing archive is reused only when that record equals the run's inflation (absent for
+    a run without); otherwise the twin job fails with the reason (`--force` rebuilds).
+- Library calls: numpy.
+- Custom code: the path length and the copy (no library dependency is wanted for an SWC edit; the fit's own
+  loader, not this module, reads the result).
+- Test oracles (`smoke_morph_inflate.py`): M1 a hand SWC: path lengths; the factor up to and including
+  `max_path_um`, soma and dendrites, not the axon; ids, types, coordinates, parents and the source file unchanged.
+  M2 factor 1 = identity; `max_path_um` 0 = the root only; a huge one = all but the axon. M3 refusals. M4 (NEURON,
+  the fixture of `smoke_twin_recovery.py`, a plain run and an inflated run): both archives' `reconstruction.swc`
+  equal the real cell's byte for byte; the simulation morphology's radii are the original times the expected
+  factor; the provenance record; the options' keys only in the inflated run. M5 same truth, no noise: every long
+  step's peak deflection is smaller in the inflated twin, and its recorded input resistance lower. M6
+  `_archive_matches` across the four pairings and another factor; the inflated twin's fit has
+  `morphology_source` = archive. M7 ASCII/LF.
+- Data flow: Blocks 12 and 22; nothing downstream changes (the fit, the sensitivity mode and the reports read the
+  archive as before).
+- Confirmed: yes -- the user, 2026-11-27 (D-268): the twins on the inflated morphology, the fit on the original;
+  factor 1.5; soma and dendrites; up to 300 um of path length through the branches from the soma; a hard step.
+  The node-level step and the path length from the root node are the orchestrator's.
+- Status: smoke-tested 2026-11-27 (sandbox, NEURON 9: `smoke_morph_inflate.py` M1-M7 7/7; on the fixture 31 of 51
+  nodes inflated, long-step deflections 0.63 of the plain twin's, input resistance 194.8 -> 122.4 MOhm;
+  `smoke_twin_build.py` 11 pass, `smoke_twin_recovery.py` 22 pass, `smoke_twin_sensitivity.py` 8 pass; the spec
+  tests of Blocks 8, 12, 22, 28 pass). Not yet checked by an independent agent.
 
 ## 6. Pipeline entry points
 

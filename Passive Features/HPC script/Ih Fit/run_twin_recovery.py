@@ -78,7 +78,7 @@ import dataclasses
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Mapping, Optional, Sequence
 
 HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
@@ -326,6 +326,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--base-seed", type=_non_negative_int, default=TwinConfig().base_seed,
                    help="root of the twins' noise streams, SPEC 2.7 (e) (amendment 8.3); recorded as "
                         "run_config.json's twin_config.base_seed")
+    p.add_argument("--twin-diam-factor", type=float, default=1.0,
+                   help="Block 29 (SPEC 2.11, D-268): the twins are SIMULATED on their real cell's morphology "
+                        "with the radii of soma and dendrites multiplied by this factor within "
+                        "--twin-diam-max-path-um of path length from the soma; the fit still reads the "
+                        "original reconstruction. 1 (default) = no inflation")
+    p.add_argument("--twin-diam-max-path-um", type=float, default=300.0,
+                   help="Block 29: path length from the soma (um) up to which --twin-diam-factor applies "
+                        "(a hard step); used only when the factor is not 1")
     p.add_argument("--force", action="store_true", help="re-plan a run directory planned with other options")
     # the truth (run_ih_recovery.py's names, types and defaults)
     p.add_argument("--ra-mode", default=d["ra_mode"], choices=["per_cohort", "per_cell"])
@@ -449,6 +457,17 @@ def plan_options(args) -> Dict[str, object]:
     }
     for name in TRUTH_OPTIONS + FIT_OPTIONS + TOL_OPTIONS:
         opts[name] = getattr(args, name)
+    # Block 29: recorded only when the twins are inflated, so that a run planned before Block 29 (no such
+    # keys) still compares equal to the same plan made now
+    factor = float(getattr(args, "twin_diam_factor", 1.0))
+    max_path = float(getattr(args, "twin_diam_max_path_um", 300.0))
+    if not (np.isfinite(factor) and factor > 0.0):
+        raise Refused("--twin-diam-factor must be finite and > 0, got %r" % (factor,))
+    if not (np.isfinite(max_path) and max_path >= 0.0):
+        raise Refused("--twin-diam-max-path-um must be finite and >= 0, got %r" % (max_path,))
+    if factor != 1.0:
+        opts["twin_diam_factor"] = factor
+        opts["twin_diam_max_path_um"] = max_path
     return opts
 
 
@@ -839,9 +858,20 @@ def _results_row(csv: Path, twin_id: int) -> Optional[pd.DataFrame]:
     return rows if len(rows) else None
 
 
-def _archive_matches(spec_dir: Path, spec, tcfg: TwinConfig, with_noise: bool) -> Optional[str]:
+def twin_inflation(opts: Mapping[str, object]) -> Optional[Dict[str, float]]:
+    """Block 29: {factor, max_path_um} of a run whose twins are simulated on an inflated morphology; None for
+    a run without inflation (factor 1 or the options absent)."""
+    factor = float(opts.get("twin_diam_factor", 1.0))
+    if factor == 1.0:
+        return None
+    return dict(factor=factor, max_path_um=float(opts.get("twin_diam_max_path_um", 300.0)))
+
+
+def _archive_matches(spec_dir: Path, spec, tcfg: TwinConfig, with_noise: bool,
+                     inflation: Optional[Mapping[str, float]] = None) -> Optional[str]:
     """None when the archive's twin block is this spec's (and, Block 17, its
-    with_noise the manifest's); else why not."""
+    with_noise the manifest's; Block 29, its simulation morphology's
+    inflation the run's); else why not."""
     meta = _read_json(spec_dir / "metadata.json")
     if meta is None:
         return "metadata.json unreadable"
@@ -855,6 +885,13 @@ def _archive_matches(spec_dir: Path, spec, tcfg: TwinConfig, with_noise: bool) -
     if got != want or int(meta.get("specimen_id", -1)) != int(spec.twin_id) \
             or float(meta.get("v_rest_mV", float("nan"))) != float(spec.v_rest_mV):
         return "its metadata (%r) is not the manifest's twin (%r)" % (got, want)
+    have = ((tw.get("provenance") or {}).get("sim_morphology") or None)
+    have = None if have is None else dict(factor=float(have.get("factor", 1.0)),
+                                          max_path_um=float(have.get("max_path_um", float("nan"))))
+    wanted = None if inflation is None else dict(factor=float(inflation["factor"]),
+                                                 max_path_um=float(inflation["max_path_um"]))
+    if have != wanted:
+        return "its simulation morphology's inflation (%r) is not the run's (%r)" % (have, wanted)
     return None
 
 
@@ -879,7 +916,7 @@ def build_if_needed(run: Dict[str, object], row, tcfg: TwinConfig, argv: Sequenc
         spec = TM.twin_spec_of(row, F=float(opts["F"]))
         complete = (spec_dir / "metadata.json").is_file()
         if complete and not force:
-            why = _archive_matches(spec_dir, spec, tcfg, with_noise)
+            why = _archive_matches(spec_dir, spec, tcfg, with_noise, twin_inflation(opts))
             if why is not None:
                 return "the archive %s exists but %s; run with --force to rebuild" % (spec_dir, why)
             _say("twin %d: archive complete (%s); not rebuilt" % (tid, spec_dir))
@@ -888,13 +925,28 @@ def build_if_needed(run: Dict[str, object], row, tcfg: TwinConfig, argv: Sequenc
             ih_spec, pspec = twin_model(fit_args, conf)
             table = TT.read_twin_sweep_table(run["paths"]["table"])
             real_dir = Path(run["config"]["group_dir"]) / ("specimen_%d" % real_id)
+            prov = dict(run_dir=str(out), code_commit=status["code_commit"],
+                        code_dirty=status["code_dirty"], manifest_seed=int(row["manifest_seed"]),
+                        driver="run_twin_recovery.py")
+            sim_swc = None
+            infl = twin_inflation(opts)
+            if infl is not None:
+                # Block 29: the twin is simulated on its real cell's morphology with the proximal radii
+                # inflated; the archive keeps the original reconstruction.swc, which the fit reads
+                import morph_inflate as MI
+                sim_swc = group_dir / ("sim_morphology_%d.swc" % tid)
+                counts = MI.inflate_swc(real_dir / "reconstruction.swc", sim_swc, factor=infl["factor"],
+                                        max_path_um=infl["max_path_um"])
+                prov["sim_morphology"] = dict(factor=infl["factor"], max_path_um=infl["max_path_um"],
+                                              n_nodes=counts["n_nodes"], n_inflated=counts["n_inflated"],
+                                              file=sim_swc.name)
+                _say("twin %d: simulated on the inflated morphology (radius x %g within %g um: %d of %d nodes)"
+                     % (tid, infl["factor"], infl["max_path_um"], counts["n_inflated"], counts["n_nodes"]))
             _clear_sections()
             try:
                 TB.build_twin(spec, real_dir, table, group_dir, ih_spec=ih_spec, apply_theta=pspec.apply,
-                              cfg=tcfg, overwrite=True, with_noise=with_noise,
-                              provenance=dict(run_dir=str(out), code_commit=status["code_commit"],
-                                              code_dirty=status["code_dirty"], manifest_seed=int(row["manifest_seed"]),
-                                              driver="run_twin_recovery.py"))
+                              cfg=tcfg, overwrite=True, with_noise=with_noise, provenance=prov,
+                              sim_swc_path=sim_swc)
             finally:
                 _clear_sections()
             status["built"] = True
