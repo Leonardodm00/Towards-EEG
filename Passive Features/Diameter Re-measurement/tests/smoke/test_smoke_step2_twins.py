@@ -1,6 +1,6 @@
 """Smoke test for the twins of step 2 and the training/validation split -- Block 53 in specs/SPEC.md
-(section 5, "Kernel calibration, step 2"; D-261.5, D-274.1, D-274.4): analysis.step2_twins.build_twins,
-split_twins and fit_planes.
+(section 5, "Kernel calibration, step 2"; D-261.5, D-274.1, D-274.4; amendment 1):
+analysis.step2_twins.build_twins, split_twins and fit_planes.
 
 Inputs are built here from the contract: synthetic PlaneScan objects and node-record dicts in the format of
 calibration.node_records / pilot_record. No other step-2 block is imported.
@@ -8,13 +8,14 @@ calibration.node_records / pilot_record. No other step-2 block is imported.
 Checks
     test_known_answer   split_twins' counts by SPEC's rule on hand-computed cases (one cell of 8 near; cells of
                         1, 2, 5 near and 3 far; f = 0, 0.25, 0.5; a case where the leftover seats need a second
-                        pass; one-twin cells), every count derived in the comments from the rule; fit_planes'
+                        pass, amendment 1; one-twin cells), every count derived in the comments from the rule; fit_planes'
                         masks written out by hand on a scan with a non-ok and a NaN plane
     test_reference      build_twins: every field equals its source (scan or record); split_twins: the validation
                         nodes equal the first V_c of default_rng([seed, cell_id, 0|1]).permutation of the sorted
                         node ids, restated here independently
     test_convergence    not a discretisation (SkipTest)
-    test_invariants     no cell emptied of training twins (random cases), sum_c V_c <= V_s, the same roles under a
+    test_invariants     no cell emptied of training twins (random cases), sum_c V_c = min(V_s, sum_c (n_c - 1)),
+                        the same roles under a
                         shuffled input, another seed changes the choice but not the counts
     test_contract       types, shapes, dtypes, read-only arrays, input arrays left writeable and unchanged
     test_determinism    two splits with one seed agree
@@ -97,13 +98,14 @@ def observed_order(h, err):
 # ------------------------------------------------------- synthetic inputs ---
 
 def make_scan(node_id, set_="near", k_star=10, P=3, bg_sd=True, se=True):
-    """A PlaneScan of planes k* - P .. k* + P with values distinct per node and plane."""
+    """A PlaneScan of planes k* - P .. k* + P with values distinct per node and plane; its k_star and z_sub_um
+    are make_pilot's (amendment 1 checks them), its d_hat_um and alpha_hat deliberately not."""
     ks = np.arange(k_star - P, k_star + P + 1, dtype=np.int64)
     n = ks.size
     q = np.arange(n, dtype=np.float64)
     base = 0.001 * node_id
     return PlaneScan(
-        node_id=node_id, d_hat_um=0.9, phi_rad=0.1, alpha_hat=0.3, k_star=k_star, z_sub_um=-99.0,
+        node_id=node_id, d_hat_um=0.9, phi_rad=0.1, alpha_hat=0.3, k_star=k_star, z_sub_um=2.8 + 0.01 * node_id,
         ks=ks, z_um=0.28 * ks, omega_um2=0.05 + base + 0.01 * q, vw_um2=0.06 + 0.01 * q,
         area_gl_um=20.0 + base + q, depth_gl=10.0 + q, B_bar=180.0 + base + 0.5 * q,
         status=tuple("ok" for _ in range(n)), set=set_,
@@ -131,6 +133,7 @@ def make_twin(cell_id, node_id, set_="near"):
     z = np.zeros(1)
     return T.Twin(cell_id=cell_id, node_id=node_id, set=set_, role="train", d_um=1.0, mu_per_um=0.4,
                   k_star=0, z_sub_um=0.0, cx_um=0.0, cy_um=0.0, theta_rad=0.0, phi_rad=0.0,
+                  B_pilot_gl=180.0, d_pilot_um=1.0, alpha_pilot=0.4,
                   ks=np.zeros(1, dtype=np.int64), B_gl=z, noise_sd_gl=z, omega_um2=z, se_omega_um2=z,
                   area_gl_um=z, status=("ok",))
 
@@ -181,8 +184,7 @@ def test_known_answer():
     # f = 0.5, near: V = floor(4 + 0.5) = 4; V n_c = 4, 8, 20; floors 0, 1, 2; remainders 4, 0, 4; one seat
     #   left: 101 and 103 tie at 4/8 -> 101 first (lower id) but is at its cap 0, so the seat goes to the next,
     #   103 (2 -> 3 <= cap 4). V_c = 0, 1, 3 (sum 4 = V).
-    #   [This line rests on the reading "a seat a capped cell cannot take goes to the next cell in the ranking";
-    #   under "it is dropped" V_103 would be 2. Reported to the orchestrator as the open reading.]
+    #   (Amendment 1: a seat a capped cell cannot take goes to the next cell in the ranking.)
     # f = 0.5, far: V = floor(1.5 + 0.5) = 2; cap of 103 is 2: V_103 = 2.
     cases = {
         0.0: {(101, "near"): 0, (102, "near"): 0, (103, "near"): 0, (103, "far"): 0},
@@ -195,7 +197,7 @@ def test_known_answer():
     # -- leftover seats needing a second pass: cells 201, 202, 203 with 1 near each, 204 with 10 near; N = 13.
     # f = 0.5: V = floor(6.5 + 0.5) = 7; V n_c = 7, 7, 7, 70; floors //13 = 0, 0, 0, 5; remainders %13 =
     #   7, 7, 7, 5; caps 0, 0, 0, 9. Two seats left; the one-twin cells cannot take any, so both go to 204:
-    #   V_204 = 7 (sum 7 = V). [Same open reading as above.]
+    #   V_204 = 7 (sum 7 = V), the second seat in a second pass (amendment 1).
     got = counts(T.split_twins(twins_of({201: (1, 0), 202: (1, 0), 203: (1, 0), 204: (10, 0)}), 0.5, SEED))
     assert got == {(201, "near"): 0, (202, "near"): 0, (203, "near"): 0, (204, "near"): 7}, got
     # -- what cannot be placed is dropped: one cell with 1 near, f = 0.5: V = floor(0.5 + 0.5) = 1, cap 0 -> 0.
@@ -245,9 +247,11 @@ def test_reference():
         assert t.cell_id == 55 and t.role == "train" and t.set == s.set == r["set"]
         assert t.d_um == r["allen_diameter_um"] and t.mu_per_um == p["mu_hat_per_um"]
         assert t.k_star == p["k_star"]
-        # the pilot's z_sub_um, not the scan's (-99 in these synthetic scans)
         for name in ("z_sub_um", "cx_um", "cy_um", "theta_rad", "phi_rad"):
             assert getattr(t, name) == p[name], name
+        # amendment 1: the pilot's B_bar, d_hat_um, alpha_hat (not the scan's d_hat_um 0.9, alpha_hat 0.3)
+        assert t.B_pilot_gl == p["B_bar"] and t.d_pilot_um == p["d_hat_um"] and t.alpha_pilot == p["alpha_hat"]
+        assert t.d_pilot_um != s.d_hat_um and t.alpha_pilot != s.alpha_hat
         assert_array_equal(t.ks, s.ks)
         assert_array_equal(t.B_gl, s.B_bar)
         assert_array_equal(t.noise_sd_gl, s.bg_sd_gl)
@@ -321,7 +325,8 @@ def test_contract():
     t = T.build_twins(3, scans, {4: make_record(4)}, [4])[0]
     n = scans[0].ks.size
     assert type(t.cell_id) is int and type(t.node_id) is int and type(t.k_star) is int
-    for name in ("d_um", "mu_per_um", "z_sub_um", "cx_um", "cy_um", "theta_rad", "phi_rad"):
+    for name in ("d_um", "mu_per_um", "z_sub_um", "cx_um", "cy_um", "theta_rad", "phi_rad", "B_pilot_gl",
+                 "d_pilot_um", "alpha_pilot"):
         assert type(getattr(t, name)) is float, name
     assert t.ks.dtype == np.int64 and t.ks.shape == (n,)
     for name in ("B_gl", "noise_sd_gl", "omega_um2", "se_omega_um2", "area_gl_um"):
@@ -382,8 +387,9 @@ def test_edge_cases():
     rec = copy.deepcopy(good_rec)
     rec["pilot"] = None
     _refusal(1, [good_scan], {1: rec}, [1], [1])                                   # no pilot
-    for name in ("mu_hat_per_um", "cx_um", "cy_um", "theta_rad", "phi_rad", "z_sub_um"):
-        for bad in (None, float("nan")):
+    for name in ("mu_hat_per_um", "cx_um", "cy_um", "theta_rad", "phi_rad", "z_sub_um", "alpha_hat", "B_bar",
+                 "d_hat_um"):
+        for bad in (None, float("nan"), float("inf")):
             rec = copy.deepcopy(good_rec)
             rec["pilot"][name] = bad
             msg = _refusal(1, [good_scan], {1: rec}, [1], [1])
@@ -391,10 +397,27 @@ def test_edge_cases():
         rec = copy.deepcopy(good_rec)
         del rec["pilot"][name]
         _refusal(1, [good_scan], {1: rec}, [1], [1])
-    for bad in (0.0, -0.1):
+    for name in ("mu_hat_per_um", "B_bar", "d_hat_um"):
+        for bad in (0.0, -0.1):
+            rec = copy.deepcopy(good_rec)
+            rec["pilot"][name] = bad
+            msg = _refusal(1, [good_scan], {1: rec}, [1], [1])                     # not > 0
+            assert name in msg, msg
+    # alpha_hat needs only to be finite (SPEC): 0 and a negative value are accepted
+    for ok in (0.0, -0.1):
         rec = copy.deepcopy(good_rec)
-        rec["pilot"]["mu_hat_per_um"] = bad
-        _refusal(1, [good_scan], {1: rec}, [1], [1])                               # mu not > 0
+        rec["pilot"]["alpha_hat"] = ok
+        assert T.build_twins(1, [good_scan], {1: rec}, [1])[0].alpha_pilot == ok
+    # amendment 1: the scan's k_star and z_sub_um against the pilot's
+    msg = _refusal(1, [dataclasses.replace(good_scan, k_star=11)], {1: good_rec}, [1], [1])
+    assert "k_star" in msg, msg
+    z0 = good_rec["pilot"]["z_sub_um"]
+    msg = _refusal(1, [dataclasses.replace(good_scan, z_sub_um=z0 + 1e-6)], {1: good_rec}, [1], [1])
+    assert "z_sub_um" in msg, msg
+    _refusal(1, [dataclasses.replace(good_scan, z_sub_um=float("nan"))], {1: good_rec}, [1], [1])
+    # within the 1e-9 um tolerance: accepted, and the twin holds the pilot's value
+    t_ok = T.build_twins(1, [dataclasses.replace(good_scan, z_sub_um=z0 + 1e-10)], {1: good_rec}, [1])[0]
+    assert t_ok.z_sub_um == z0
     rec = copy.deepcopy(good_rec)
     rec["pilot"]["k_star"] = None
     msg = _refusal(1, [good_scan], {1: rec}, [1], [1])                             # no k_star

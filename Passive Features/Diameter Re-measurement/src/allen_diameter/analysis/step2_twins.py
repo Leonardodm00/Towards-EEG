@@ -1,7 +1,8 @@
 """The twins of step 2: settings and real measurements per chosen node, and the training/validation split --
 Block 53 in specs/SPEC.md (section 5, "Kernel calibration, step 2"). No file access, no rendering.
 
-Contract of wave 9 (2026-11-27; D-261.5, D-274.1, D-274.4). Pure ASCII, for the cluster (hpc-python-compat).
+Contract of wave 9 (2026-11-27; D-261.5, D-274.1, D-274.4), with its amendment 1 (the pilot's B_bar, d_hat_um and
+alpha_hat held; the scan's k_star and z_sub_um checked against the pilot's; the split's capped seats passed on). Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
 
@@ -15,8 +16,13 @@ import numpy as np
 SETS = ("near", "far")
 ROLES = ("train", "validation")
 
-# The pilot fields a twin holds (besides k_star): each must be a finite number (D-274.1; SPEC Block 53).
-_PILOT_FLOAT_FIELDS = ("mu_hat_per_um", "cx_um", "cy_um", "theta_rad", "phi_rad", "z_sub_um")
+# The pilot fields a twin holds (besides k_star): each must be a finite number (D-274.1; SPEC Block 53 and its
+# amendment 1); those in _PILOT_POSITIVE must also be > 0.
+_PILOT_FLOAT_FIELDS = ("mu_hat_per_um", "cx_um", "cy_um", "theta_rad", "phi_rad", "z_sub_um", "alpha_hat", "B_bar",
+                       "d_hat_um")
+_PILOT_POSITIVE = ("mu_hat_per_um", "B_bar", "d_hat_um")
+# A scan's z_sub_um and its pilot's are one number written twice: they agree to this (um; SPEC amendment 1).
+_Z_SUB_TOL_UM = 1e-9
 
 
 @dataclass(frozen=True)
@@ -36,6 +42,9 @@ class Twin:
     cy_um: float
     theta_rad: float            # heading
     phi_rad: float              # tilt
+    B_pilot_gl: float           # the pilot's B_bar (gl): read by the scan's stripe support (amendment 1)
+    d_pilot_um: float           # the pilot's d_hat_um (um): the scan's own-cylinder diameter (amendment 1)
+    alpha_pilot: float          # the pilot's alpha_hat (amendment 1)
     ks: np.ndarray              # (n,) int64 plane indices of the real scan
     B_gl: np.ndarray            # (n,) the real plane's background at the node (PlaneScan.B_bar)
     noise_sd_gl: np.ndarray     # (n,) the real plane's background SD (PlaneScan.bg_sd_gl)
@@ -85,11 +94,17 @@ def _twin_problems(scan, rec):
             x = pilot.get(name)
             if not _finite_number(x):
                 why.append("pilot %s %r not finite" % (name, x))
-            elif name == "mu_hat_per_um" and not float(x) > 0.0:
-                why.append("pilot mu_hat_per_um %r not > 0" % (x,))
+            elif name in _PILOT_POSITIVE and not float(x) > 0.0:
+                why.append("pilot %s %r not > 0" % (name, x))
         k = pilot.get("k_star")
         if not _finite_number(k) or float(k) != int(float(k)):
             why.append("pilot k_star %r missing or not an integer" % (k,))
+        elif int(float(k)) != int(scan.k_star):
+            why.append("scan k_star %d differs from the pilot's %d" % (int(scan.k_star), int(float(k))))
+        z = pilot.get("z_sub_um")
+        if _finite_number(z) and not abs(float(scan.z_sub_um) - float(z)) <= _Z_SUB_TOL_UM:
+            why.append("scan z_sub_um %r differs from the pilot's %r by more than %g um"
+                       % (scan.z_sub_um, z, _Z_SUB_TOL_UM))
     if scan.bg_sd_gl is None:
         why.append("scan without bg_sd_gl")
     # The (n,) arrays must agree with ks (the contract's shapes); a malformed scan is refused, not truncated.
@@ -110,7 +125,9 @@ def build_twins(cell_id, scans, nodes, chosen_ids):
     """list[Twin] in the order of chosen_ids, role "train": scans a sequence of PlaneScan, nodes {node id: node
     record} (Block 52's CellScans). ValueError naming every offending node id: no scan, no record, a record whose
     set differs from the scan's, a non-finite or non-positive allen_diameter_um, a pilot without finite
-    mu_hat_per_um > 0, cx_um, cy_um, theta_rad, phi_rad, z_sub_um or without k_star, a scan without bg_sd_gl."""
+    mu_hat_per_um > 0, cx_um, cy_um, theta_rad, phi_rad, z_sub_um, alpha_hat, finite B_bar > 0 and d_hat_um > 0, or
+    without k_star; a scan without bg_sd_gl; a scan whose k_star differs from the pilot's or whose z_sub_um differs
+    from the pilot's by more than 1e-9 um (amendment 1)."""
     by_id = {}
     dup_scan = set()
     for s in scans:
@@ -153,6 +170,8 @@ def build_twins(cell_id, scans, nodes, chosen_ids):
             k_star=int(float(pilot["k_star"])), z_sub_um=float(pilot["z_sub_um"]),
             cx_um=float(pilot["cx_um"]), cy_um=float(pilot["cy_um"]),
             theta_rad=float(pilot["theta_rad"]), phi_rad=float(pilot["phi_rad"]),
+            B_pilot_gl=float(pilot["B_bar"]), d_pilot_um=float(pilot["d_hat_um"]),
+            alpha_pilot=float(pilot["alpha_hat"]),
             ks=_ro(scan.ks, np.int64), B_gl=_ro(scan.B_bar, np.float64),
             noise_sd_gl=_ro(scan.bg_sd_gl, np.float64), omega_um2=_ro(scan.omega_um2, np.float64),
             se_omega_um2=_ro(se, np.float64), area_gl_um=_ro(scan.area_gl_um, np.float64),
@@ -166,10 +185,9 @@ def _allocate(V, counts):
     """{cell_id: V_c}: V seats shared among the cells in proportion to counts {cell_id: n_c} by largest
     remainders, ties to the lower cell_id, each V_c <= n_c - 1. Exact integer arithmetic: the quota of cell c
     is V n_c / N, its floor (V n_c) // N and its remainder (V n_c) % N (over N).
-    Placement of the seats left after the floors (reading of "what cannot be placed is dropped", flagged to the
-    orchestrator): they are offered to the cells in the order (remainder descending, cell_id ascending), one
+    Placement of the seats left after the floors (SPEC amendment 1): they are offered to the cells in the order (remainder descending, cell_id ascending), one
     seat per cell per pass, a cell at its cap skipped; passes repeat until every seat is placed or every cell is
-    at its cap; what is left then is dropped."""
+    at its cap; what is left then is dropped, so sum_c V_c = min(V, sum_c (n_c - 1))."""
     N = sum(counts.values())
     if V <= 0 or N <= 0:
         return {c: 0 for c in counts}
@@ -193,8 +211,8 @@ def _allocate(V, counts):
 
 def split_twins(twins, validation_fraction, seed):
     """The twins in the same order with their roles set (D-274.4): by node, stratified by set and by cell, the
-    rule of SPEC Block 53 (largest remainders, a cell never emptied of training twins, a seeded permutation of the
-    sorted node ids). Independent of the input order. ValueError: a fraction outside [0, 1); two twins with one
+    rule of SPEC Block 53 (largest remainders, a cell never emptied of training twins, a seat a capped cell cannot
+    take passed on in repeated passes, a seeded permutation of the sorted node ids). Independent of the input order. ValueError: a fraction outside [0, 1); two twins with one
     (cell_id, node_id)."""
     twins = list(twins)
     f = validation_fraction
