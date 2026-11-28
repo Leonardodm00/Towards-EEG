@@ -331,6 +331,7 @@ the "Binds" column.
 | 2026-11-27 (the step-2 implementation chat, 22:45) | Logs **D-278** (user): the davinci screening export of D-226, D-227 and D-261 is built by the step-2 implementation chat, as the log describes it (SPEC Blocks 61 and 62, a step `screening` in the per-cell array); the independent check's spec tests are committed. The fixes of D-277 are merged (`fea7cbf` on `sci/diameter-pipeline`); a second independent check runs. Next free IDs: D-279, I-008. |
 | 2026-11-28 (the step-2 implementation chat, 00:30) | Logs **D-279** [orchestrator]: the screening export built and pushed (`70bc8a8` on `sci/diameter-pipeline`: SPEC Blocks 61 and 62, the step `screening`, the davinci run's commands in the davinci handoff's section 10; not run on real images); the second independent check of step 2's wave 1 (report `2026-11-27_2211`, PASS WITH ISSUES, no finding above NOTE) settled; the twins' noise SD does not map through the camera chain as D-275.5 assumed (0.5 to 1.2 gl in reads 0, 1.5 to 3 gl reads about 1.5 gl), for wave 2. The checks' spec tests committed (D-278.3). Next free IDs: D-280, I-008. |
 | 2026-11-28 (the step-2 implementation chat, 12:45) | Logs **D-280** (user): on the screening sheets Allen's diameter is drawn as two thin segments parallel to the node's heading, centred on D-261.1's two points, not as two circles. Next free IDs: D-281, I-008. |
+| 2026-11-28 (the step-2 implementation chat, 13:05) | Logs **D-281** (user): the davinci screening run covers all the cells of the archive (every `specimen_<id>` under `L<n>_exc` and `L<n>_inh`; 68 in the user's listing), not the 18 L3_exc cells of D-226.2's provisional reading and D-278.1; D-226 and D-278 annotated. Next free IDs: D-282, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -544,7 +545,7 @@ would be needed*, *Status*.
 | D-223 | 2026-11-23 | the final check of wave 6 (report 2026-11-23_0027, PASS WITH ISSUES): `fit_soma.py`'s mask and morphology arrays, `calibrate_sigma.py`'s last line | the mask's segments from the crop widened by `mask_widen_um`; the edited tree for the stems' next nodes; the failed ids named [orchestrator] | active |
 | D-224 | 2026-11-23 | wave 7 (the calibrated-kernel switch; the SGT option in Blocks 26, 35 and 30); Block 30's error bars; `tests/spec/` | wave 7 as proposed; the covariance on a finer lattice for both kernels; the three tester runs' spec tests into the working line [user] | active |
 | D-225 | 2026-11-23 | wave 7's contract: Block 49 (the SGT kernel in the line renderer), Block 30 amendment 3, Block 36 amendments 22-23; `InferenceConfig.kernel_family`, `sgt_*`, `cov_*` | the isotropic PSF by an FFT path (not the separable construction); the half-plane skew; truncation at 12 law SDs; the shape in log10 beta, xi, ln zeta, xi = 0 converged; the error bars' steps; the width switch's flags [orchestrator] | active |
-| D-226 | 2026-11-23 | the defocus kernel calibration's nodes and cells (Block 10's candidates, D-170's pool, D-175's davinci run); a screening export of node images on davinci; a Colab notebook for by-eye diameters | the user chooses the calibration nodes from per-node images (focus and $k^* \pm 3$ near, $k^* \pm 1..16$ far) of the passive + I_h fit's cells and sets their diameters by eye in Colab | active; not built |
+| D-226 | 2026-11-23 | the defocus kernel calibration's nodes and cells (Block 10's candidates, D-170's pool, D-175's davinci run); a screening export of node images on davinci; a Colab notebook for by-eye diameters | the user chooses the calibration nodes from per-node images (focus and $k^* \pm 3$ near, $k^* \pm 1..16$ far) of the passive + I_h fit's cells and sets their diameters by eye in Colab | active; not built [2026-11-28: all the archive's cells, D-281] |
 | D-227 | 2026-11-23 | D-226's screening export (per node, per plane) | beside each plane's image, the intensity profile along the node's measuring line in that plane | active; not built |
 | D-228 | 2026-11-23 | step 2 of the kernel calibration (procedure §3.4 item 2; NS1; T10), its trial table; the far-field slope (T6) | the trial table is $(\theta_1, \theta_2, \theta_3, \gamma)$: the slope is fitted too, fixed in practice by the far-set twins; $\sigma_{\rm r}(0)$ held | active; not built |
 | D-229 | 2026-11-23 | step 2's matching (D-228): the far twins' statistic, the planes and their weights, the slope with few far nodes | core widths for the far twins too (form B); planes weighted by distance from focus, near $k^* \pm 1..3$, far $|k-k^*|$ = 4..16 with the far nodes' $\pm 3$ planes as validation; the slope always fitted | active; not built |
@@ -596,9 +597,10 @@ would be needed*, *Status*.
 | D-275 | 2026-11-27 | SPEC section 5 'Kernel calibration, step 2' on `sci/diameter-pipeline`: Block 4 amendment 4, `Step2Config`, Blocks 52 to 56; D-181, D-265, D-270 to D-274 | the contract's choices: the spline as a table family (no new field, hashes unchanged), its growth floored at zero (PROVISIONAL), the node list as a CSV, the split's allocation, the twins' camera settings, the clustered and classical covariances [orchestrator] | active; amendment implemented, blocks drafted |
 | D-276 | 2026-11-27 | SPEC Blocks 53 to 56 on `sci/diameter-pipeline` (amendment 1, `5962ca3`); D-270, D-273.3, D-274.4 | the twin's scan node is the real pilot's in every attribute (`B_bar`, `d_hat_um`, `alpha_hat` added to the twin); a capped cell's validation seat is passed on; the estimator's Jacobian takes absolute steps through a callable [orchestrator] | active |
 | D-277 | 2026-11-27 | SPEC Blocks 52 to 56, Block 4 amendment 4, Block 15 amendment on `sci/diameter-pipeline` (amendments 2 and 3); the report of 2026-11-27_1904; D-273.2, D-275, D-276 | the final check of step 2's wave 1 settled: a twin is scanned without the goodness-of-fit screen; the smoke suites follow `far_min_k_offset` = 4; Block 55's oracle split; D-275.2's figures corrected [orchestrator] | active; fixes with their implementers |
-| D-278 | 2026-11-27 | D-226's screening export on davinci (D-226.1-3, D-227.1, D-261.1); the spec tests of step 2's first check | the screening export is built by the step-2 implementation chat as the log describes it, on the 18 L3_exc cells; the selection returns as the CSV of D-275.3; the spec tests are committed [user] | active; not built |
+| D-278 | 2026-11-27 | D-226's screening export on davinci (D-226.1-3, D-227.1, D-261.1); the spec tests of step 2's first check | the screening export is built by the step-2 implementation chat as the log describes it, on the 18 L3_exc cells; the selection returns as the CSV of D-275.3; the spec tests are committed [user] | active; not built [2026-11-28: all the archive's cells, D-281] |
 | D-279 | 2026-11-28 | SPEC 'The screening export' (Blocks 61, 62), `scripts/survey_cells.py` (the step `screening`), the davinci handoff's section 10; the report 2026-11-27_2211; D-270.2, D-275.5 | the export's build choices (the sheets' layout, crops of 4 and 11 um, a zoomed focus pair on far sheets, an opt-in step, the configuration in the scans file); step 2's second check settled; the twins' noise mapping is not yet D-270.2's and is rebuilt in wave 2 [orchestrator] | active; export built, not run on real images |
 | D-280 | 2026-11-28 | the screening sheets (SPEC Blocks 61, 62); D-261.1's marks | Allen's diameter is drawn as two short, thin segments parallel to the node's heading at $\pm D_{\rm A}/2$ across the branch, not as circles [user]; length 1.0 um, width 0.8 pt PROVISIONAL [orchestrator] | active |
+| D-281 | 2026-11-28 | the davinci screening run (the davinci handoff's section 10); D-226.2's reading, D-278.1's cell set; step 2's node lists | the screening export runs on every cell of the archive, each `specimen_<id>` under `L<n>_exc` and `L<n>_inh` (68 in the listing of 2026-11-28), not the 18 L3_exc cells [user]; selection by `cell_pool.py pick`, probe on the pilot 529878215, array `-J 0-67` [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -14969,7 +14971,7 @@ D-175, D-178, D-194, D-198, D-199, D-211, D-213, I-006.
 **Status:** active; not built (the export, the selection list, the notebook and the pool step's reading of it to plan
 with the user). [superseded in part by D-261, 2026-11-27: D-226.4, the by-eye diameter and its notebook, is withdrawn;
 the image at focus shows Allen's diameter and the user chooses on its agreement and on clean backgrounds; step 2's
-twins carry Allen's diameter as the true one, which settles the first open point above]
+twins carry Allen's diameter as the true one, which settles the first open point above] [updated 2026-11-28: the cell set is all the archive's cells (68), not the 18 L3_exc cells, **D-281**]
 
 ## D-227 -- Beside each plane's image of a node, its intensity profile along the measuring line (user)
 
@@ -16924,7 +16926,7 @@ minimum number of chosen nodes per cell.
 **Sources.** **[user]** 2026-11-27, 22:45. **[log]** D-124, D-226, D-227, D-261, D-275. **[src]**
 `scripts/survey_cells.py` on `sci/diameter-pipeline` at `fea7cbf`.
 
-**Status:** active; not built. [2026-11-28: built and pushed, D-279; not run on real images]
+**Status:** active; not built. [2026-11-28: built and pushed, D-279; not run on real images] [updated 2026-11-28: the cell set is all the archive's cells (68), not the 18 L3_exc cells, **D-281**]
 
 ---
 
@@ -17005,5 +17007,49 @@ this date) would be redrawn from the saved views (`screening_<sid>.npz`) without
 **What it does not decide.** The length and the width, if the user wants others.
 
 **Sources.** **[user]** 2026-11-28, 12:45. **[log]** D-261, D-278, D-279.
+
+**Status:** active.
+
+---
+
+## D-281 -- The screening run covers all the cells of the archive (68), not the 18 L3_exc cells (user)
+
+**Date:** 2026-11-28, 13:05 (Europe/Rome), the step-2 implementation chat. **Binds:** the davinci screening run
+(the davinci handoff's section 10; `cell_pool.py pick`; `scripts/pbs/survey_cells.pbs`); D-226.2's reading and
+D-278.1's cell set; the node lists that come back (D-261.2, D-275.3); step 2's training and validation sets (D-274).
+
+**Decision [user].** To the run's step "Pick the 18 L3_exc cells" the user answered: "All the cells saved (these are
+in teh folders L{n}_exc or inh and listed as spiecements{idnumber}", attaching the recursive listing of the archive
+directory.
+
+**Statement.** (D-281.1) The screening export runs on every cell of the archive
+`/davinci-1/home/ldellamea/Human Neurons Fitting`: every directory `specimen_<id>` directly under a group directory
+`L<n>_exc` or `L<n>_inh` [user]. In the user's listing of 2026-11-28 these are 68 cells, all with distinct ids:
+L2_exc 10, L2_inh 1, L3_exc 18, L3_inh 11, L4_exc 6, L4_inh 2, L5_exc 8, L5_inh 5, L6_exc 5, L6_inh 2 **[data
+inspected: the directory listing, not the cells' files]**. D-226.2's reading (the 18 L3_exc cells, marked
+PROVISIONAL and "to be confirmed") and D-278.1's "the 18 L3_exc cells" are superseded on this point; nothing else of
+D-226, D-227, D-261 or D-278 changes. (D-281.2) [orchestrator] The selection is made from the directory names at run
+time (`ls -d "$A"/L?_exc/specimen_* "$A"/L?_inh/specimen_*`, ids in ascending order) by `cell_pool.py pick` into
+`selection_all.csv`; the probe runs on the pilot 529878215 by `DIAM_CELLS`, a cell whose earlier steps are known, not
+on the selection's first row; the array is `-J 0-67`, one core per task (68 cores, under D-274's cap of 100).
+(D-281.3) [orchestrator] A cell set aside at the alignment (D-085.2) has no sheets; such cells are listed after the
+array and the user decides whether they run with `DIAM_INCLUDE_SET_ASIDE=1` (as in D-098.5).
+
+**Why.** **[user]** as quoted: the cells of the passive + I_h fit are all the archive's cells, not one group of
+them. **[log]** D-085's status note of 2026-10-28: the acquisition check found 158 of 158 pool cells at a plane
+spacing of 0.28 um and 0.1144 um per pixel, so the cells of every layer and class were imaged at the settings the
+pipeline assumes [not re-checked here; the prepare job prints the count again]. **[run, 2026-11-28]** on a stand-in
+of the archive tree with the 68 ids and a 158-cell pool: the pick gives 68 cells and 69 lines, refuses an id outside
+the pool, and the job script's dry run accepts task 67 and refuses task 68 (exit 4).
+
+**What it implies for code and tables.** No code changes: the handoff's section 10, rows 4 to 8. The chosen-nodes
+CSV may name cells of any group; D-274's split by node, stratified by set and cell, runs over them.
+
+**What it does not decide.** From which groups the user takes calibration nodes; whether the validation set is also
+stratified by class or layer; the set-aside cells (D-281.3); the number of sheets per cell and the run's size, which
+the probe measures.
+
+**Sources.** **[user]** 2026-11-28, 13:05, with the attached listing (`ls -R` of the archive). **[log]** D-085,
+D-098.5, D-124.2, D-226, D-274, D-278. **[run]** the stand-in test above.
 
 **Status:** active.
