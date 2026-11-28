@@ -911,6 +911,15 @@ implementation:
     needs_theory: []
     needs_hpc: false
     jobs: []
+  - id: I63
+    title: "Parallel survey runner; the screening run in Colab"
+    summary: "Runs survey_cells.py over the selection with several worker processes, resumable across sessions; drives the screening of the 68 archive cells in Colab (D-283), since davinci's proxy refuses Allen's server; the run's notebook is notebooks/screening_colab_2026-11-28."
+    block: 63
+    parent: S3c
+    depends_on: [I61, I62]
+    needs_theory: []
+    needs_hpc: false
+    jobs: []
 # Revisions: a change one side has to absorb because of the other
 # (roadmap.py revise). An implementation stage's flag clears when its
 # code changes after the flag's commit; a topic's when its status

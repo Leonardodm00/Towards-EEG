@@ -117,10 +117,15 @@ def read_selection(path):
 
 def write_status(out_dir, rows, steps):
     """status.csv: specimen_id, group, one column per step, error; rows are
-    dicts with those keys (a missing step is 'pending')."""
+    dicts with those keys (a missing step is 'pending'). Written whole through a
+    temporary named after the process, then renamed; with several runs on one
+    out_dir the last writer's rows stand (`survey_cells.py status` rebuilds the
+    whole table from the markers)."""
     cols = ["specimen_id", "group"] + list(steps) + ["error"]
     path = os.path.join(out_dir, "status.csv")
-    tmp = path + ".tmp"
+    # one temporary per process (D-284): runs on the same out_dir (a PBS array, survey_parallel.py's workers) write
+    # status.csv concurrently, and a shared temporary would let one run move another's half-written file away
+    tmp = "%s.tmp.%d" % (path, os.getpid())
     with open(tmp, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=cols, lineterminator="\n")
         w.writeheader()
