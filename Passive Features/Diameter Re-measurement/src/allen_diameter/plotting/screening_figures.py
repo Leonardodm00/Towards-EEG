@@ -14,7 +14,7 @@ are display choices of the entry.
   write_node_sheet  node_sheet saved as a PNG, the figure closed.
 
 Artists carry gids for the tests: "image", "not_fetched", "profile", "background", "allen_marks" (the image's
-two points, one Line2D), "allen_v" (the profile's two vertical lines).
+two segments of Allen's diameter, two Line2D; D-280), "allen_v" (the profile's two vertical lines).
 Pure ASCII, for the cluster (hpc-python-compat).
 """
 from __future__ import annotations
@@ -24,6 +24,7 @@ import math
 import numpy as np
 
 INK, INK2 = "#0b0b0b", "#52514e"
+MARK_LW = 0.8          # pt: the two thin segments of Allen's diameter (D-280.2, PROVISIONAL)
 BLUE, ORANGE, SURFACE, GRID = "#2a78d6", "#eb6834", "#fcfcfb", "#e4e3df"
 GREY_PERCENTILES = (1.0, 99.0)    # SPEC Block 62: the grey scale of all the node's planes
 PAIRS_PER_ROW = {"near": 1, "far": 3}
@@ -102,7 +103,7 @@ def node_sheet(view, marks, extent, dz_um, title="", zoom_half_um=None):
     x0, x1, ya, yb = (float(e) for e in extent)
     y_top, y_bot = min(ya, yb), max(ya, yb)           # y increases downwards (image frame)
     im_extent = (x0, x1, y_bot, y_top)                 # imshow(origin="upper"): row 0 at y_top
-    xy = np.asarray(marks["xy_um"], dtype=np.float64)  # (2, 2): one row per point, (x, y) um
+    segs = np.asarray(marks["segments_um"], dtype=np.float64)  # (2, 2, 2): segment, end, (x, y) um (D-280)
     v_marks = [float(t) for t in marks["v_um"]]
     v_lim = (float(np.nanmin(v)), float(np.nanmax(v))) if v.size else None
 
@@ -132,8 +133,9 @@ def node_sheet(view, marks, extent, dz_um, title="", zoom_half_um=None):
         a_im.set_title(label, loc="left", fontsize=8, color=ORANGE if star else INK,
                        fontweight="bold" if star else "normal")
         if star:
-            a_im.plot(xy[:, 0], xy[:, 1], ls="none", marker="o", ms=5, mfc="none", mec=ORANGE, mew=1.4,
-                      gid="allen_marks")
+            for seg in segs:                                   # two thin segments parallel to the heading
+                a_im.plot(seg[:, 0], seg[:, 1], ls="-", lw=MARK_LW, color=ORANGE, marker="none",
+                          solid_capstyle="butt", gid="allen_marks")
             for vm in v_marks:
                 a_pr.axvline(vm, color=ORANGE, lw=1.0, ls=":", gid="allen_v")
             for ax in (a_im, a_pr):

@@ -162,14 +162,23 @@ def node_view(cell_id, scan, record, patch) -> NodeView:
         omega_um2=np.array(scan.omega_um2, dtype=np.float64), B_bar=np.array(scan.B_bar, dtype=np.float64))
 
 
-def diameter_marks(view):
-    """{"v_um": (-D/2, +D/2), "xy_um": (2, 2) array}: Allen's diameter D on the measuring line (D-261.1), the image
-    points (cx_um, cy_um) -+ (D / 2) (-sin theta, cos theta)."""
+def diameter_marks(view, length_um):
+    """{"v_um": (-D/2, +D/2), "xy_um": (2, 2) array, "segments_um": (2, 2, 2) array}: Allen's diameter D on the
+    measuring line (D-261.1), the image points (cx_um, cy_um) -+ (D / 2) (-sin theta, cos theta), and (D-280) the
+    two segments of length length_um (um) parallel to the heading (cos theta, sin theta), centred on those points:
+    segments_um[s, e] = xy_um[s] -+ (length_um / 2) (cos theta, sin theta) for e = 0, 1. ValueError: length_um not
+    finite and > 0."""
+    half_len = 0.5 * float(length_um)
+    if not (math.isfinite(half_len) and half_len > 0.0):
+        raise ValueError("length_um must be finite and > 0, got %r" % (length_um,))
     h = 0.5 * float(view.allen_diameter_um)
     v = np.array([-h, h], dtype=np.float64)
     u = np.array([-math.sin(view.theta_rad), math.cos(view.theta_rad)])   # the line's unit vector in (x, y)
     xy = np.array([view.cx_um, view.cy_um], dtype=np.float64)[None, :] + v[:, None] * u[None, :]
-    return {"v_um": (float(v[0]), float(v[1])), "xy_um": xy}
+    along = np.array([math.cos(view.theta_rad), math.sin(view.theta_rad)])  # the heading's unit vector in (x, y)
+    ends = np.array([-half_len, half_len], dtype=np.float64)
+    segments = xy[:, None, :] + ends[None, :, None] * along[None, None, :]   # (segment, end, (x, y))
+    return {"v_um": (float(v[0]), float(v[1])), "xy_um": xy, "segments_um": segments}
 
 
 def image_extent(view):

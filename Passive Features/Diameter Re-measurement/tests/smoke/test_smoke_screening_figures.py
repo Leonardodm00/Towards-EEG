@@ -139,12 +139,18 @@ def make_view(which, rng=None, theta=0.6, invalid=(), statuses=None, k_star=40):
         status=tuple(statuses), omega_um2=np.full(n, 0.1), B_bar=np.full(n, 180.0))
 
 
+MARK_LEN = 1.0   # um, the segments' length in these tests (survey.screening_mark_length_um's default)
+
+
 def marks_of(view):
     """SPEC "common definitions": v = -+ D/2; the points (cx, cy) -+ (D/2)(-sin theta, cos theta), one per row."""
     h = 0.5 * view.allen_diameter_um
     e = np.array([-np.sin(view.theta_rad), np.cos(view.theta_rad)])
     xy = np.vstack([[view.cx_um, view.cy_um] - h * e, [view.cx_um, view.cy_um] + h * e])
-    return {"v_um": (-h, h), "xy_um": xy}
+    # D-280: two segments of length MARK_LEN parallel to the heading (cos theta, sin theta), centred on the points
+    a = np.array([np.cos(view.theta_rad), np.sin(view.theta_rad)])
+    seg = xy[:, None, :] + np.array([-0.5 * MARK_LEN, 0.5 * MARK_LEN])[None, :, None] * a[None, None, :]
+    return {"v_um": (-h, h), "xy_um": xy, "segments_um": seg}
 
 
 def extent_of(view):
@@ -216,7 +222,7 @@ def test_known_answer():
 
 
 def test_reference():
-    """S2: only the focus pair carries the marks: one artist at marks["xy_um"] on the image, two vertical lines
+    """S2: only the focus pair carries the marks: the two segments marks["segments_um"] on the image (D-280), two vertical lines
     at marks["v_um"] on the profile; the other axes none. Also the image's extent is the passed one."""
     for which in ("near", "far"):
         for theta in (0.0, 0.6, np.pi / 2):
@@ -234,8 +240,11 @@ def test_reference():
                     assert not a_im.collections and not a_im.patches
                     mk, av = lines(a_im, "allen_marks"), lines(a_pr, "allen_v")
                     if q == q_star:
-                        assert len(mk) == 1
-                        assert_array_equal(np.column_stack([mk[0].get_xdata(), mk[0].get_ydata()]), m["xy_um"])
+                        assert len(mk) == 2                                       # D-280: two segments
+                        for ln, seg in zip(mk, m["segments_um"]):
+                            assert_array_equal(np.column_stack([ln.get_xdata(), ln.get_ydata()]), seg)
+                            assert ln.get_marker() in ("none", "None", "", None) and ln.get_linestyle() == "-"
+                            assert ln.get_linewidth() <= 1.0, ln.get_linewidth()         # thin
                         assert len(av) == 2
                         got = sorted(float(np.unique(ln.get_xdata())[0]) for ln in av)
                         assert got == sorted(m["v_um"]), got
@@ -334,8 +343,10 @@ def test_zoom():
             check_close("S7 ylim", a_im.get_ylim(), (view.cy_um + z, view.cy_um - z), rtol=1e-15)
             assert a_im.get_ylim()[0] > a_im.get_ylim()[1]                       # y increases downwards
             check_close("S7 vlim", a_pr.get_xlim(), (-z, z), rtol=0, atol=0)
-            (mk,) = lines(a_im, "allen_marks")
-            assert_array_equal(np.column_stack([mk.get_xdata(), mk.get_ydata()]), m["xy_um"])
+            mk = lines(a_im, "allen_marks")
+            assert len(mk) == 2
+            for ln, seg in zip(mk, m["segments_um"]):
+                assert_array_equal(np.column_stack([ln.get_xdata(), ln.get_ydata()]), seg)
             av = lines(a_pr, "allen_v")
             assert sorted(float(ln.get_xdata()[0]) for ln in av) == sorted(m["v_um"])
             assert_array_equal(lines(a_pr, "profile")[0].get_ydata(), view.profile_gl[q_star])
@@ -410,7 +421,7 @@ def test_edge_cases():
     fig = sheet(view)
     try:
         a_im, a_pr = pairs(fig)[3]
-        assert not a_im.images and len(lines(a_im, "allen_marks")) == 1 and len(lines(a_pr, "allen_v")) == 2
+        assert not a_im.images and len(lines(a_im, "allen_marks")) == 2 and len(lines(a_pr, "allen_v")) == 2
     finally:
         plt.close(fig)
     bad = make_view("near")

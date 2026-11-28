@@ -2833,12 +2833,14 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
 - Allen's diameter (D-261.1's reading): $D_{{\rm A},i}$ = the node record's `allen_diameter_um`; the two marks are at
   $v = \pm D_{{\rm A},i}/2$ on the measuring line, i.e. at the image points (`cx_um`, `cy_um`) $\pm
   (D_{{\rm A},i}/2)\,(-\sin\theta, \cos\theta)$, $\theta$ the pilot's heading, and at the same $v$ on the focus plane's
-  profile.
+  profile. On the image each mark is a short thin segment parallel to the heading $(\cos\theta, \sin\theta)$, centred
+  on its point, of length `screening_mark_length_um` (D-280 [user]: two segments tracing the walls of a tube of
+  Allen's diameter, not circles).
 - Per cell the export writes, under `<survey>/<sid>/screening/`: one sheet per node, `<set>_<node_id>.png`; the views
   `screening_<sid>.npz`; the index `screening_index_<sid>.csv`; and `candidates_<sid>.csv`, every apt node in Block
   52's chosen-nodes format, for the user to cut down (D-278.2).
 - Configuration (`SurveyConfig`, outside every signature): `screening_near_half_um` 4.0 (the near line reaches 3 um);
-  `screening_far_half_um` 11.0 (the far line reaches 10 um); `screening_dpi` 110. PROVISIONAL, the orchestrator's.
+  `screening_far_half_um` 11.0 (the far line reaches 10 um); `screening_dpi` 110; `screening_mark_length_um` 1.0 (D-280.2). PROVISIONAL, the orchestrator's.
 
 ### Block 61: the screening views -- a node's planes, profiles and marks; the export's files (D-226, D-227, D-261.1)
 
@@ -2860,7 +2862,9 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
   - `node_view(cell_id, scan, record, patch) -> NodeView`: `patch` = (block, ks, valid, frame) in the `fetch_zblock`
     contract over the scan's planes. ValueError: the patch's `ks` are not the scan's `ks`; a scan without `v_um`,
     `w_gl` or `bhat_gl`; a non-finite `allen_diameter_um`.
-  - `diameter_marks(view) -> dict`: `v_um` = ($-D_{\rm A}/2$, $+D_{\rm A}/2$); `xy_um` (2, 2), the two image points.
+  - `diameter_marks(view, length_um) -> dict`: `v_um` = ($-D_{\rm A}/2$, $+D_{\rm A}/2$); `xy_um` (2, 2), the two image points;
+    `segments_um` (2, 2, 2) float64 (amendment 2, D-280): segment $s$, end $e$, (x, y) = `xy_um[s]` $\mp$
+    (`length_um`/2) $(\cos\theta, \sin\theta)$ for $e$ = 0, 1. ValueError: `length_um` not finite and > 0.
   - `image_extent(view) -> (x0, x1, y0, y1)` um: the crop's outer pixel edges, pixel (row, col) centred on
     ((`left` + col) p, (`top` + row) p), for `imshow(extent=..., origin="upper")` with y increasing downwards.
   - `index_row(view) -> dict`: `specimen_id`, `node_id`, `set`, `allen_diameter_um`, `k_star`, `phi_deg`,
@@ -2878,7 +2882,8 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
   test): (V1) `profile_gl` = `bhat_gl - w_gl` and `background_gl` = `bhat_gl` bit for bit, the stack and `ks`
   unchanged, a 33-plane far view and a 7-plane near view; (V2) `diameter_marks`: for $\theta$ = 0 the points are
   (`cx`, `cy` $\pm D/2$), for $\theta = \pi/2$ (`cx` $\mp D/2$, `cy`), and their distance is $D$ for any $\theta$
-  [1e-12]; (V3) `crop_bounds` equals `patch_bounds` with the set's half-width, and `image_extent` puts the pilot's
+  [1e-12]; each segment has length `length_um`, is parallel to the heading and has its point as midpoint, and for
+  $\theta$ = 0 its ends are (`cx` $\mp$ `length_um`/2, `cy` $\pm D/2$) [1e-12]; (V3) `crop_bounds` equals `patch_bounds` with the set's half-width, and `image_extent` puts the pilot's
   centre within half a pixel of the crop's middle; (V4) `save_views` then `load_views`: every field bit for bit;
   (V5) `write_candidates` read by `step2_io.read_chosen_nodes` gives every node id of the cell; `write_index`'s rows
   read by `csv.DictReader` equal `index_row`'s values; (V6) each refusal; (V7) `apt_nodes`' order.
@@ -2901,8 +2906,8 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
     $I_k(v)$ (solid) with the background (dashed), both against $v$ (um), one y-range for all the node's planes.
     Layout: a near view (7 planes) as 7 rows of one pair; a far view (33 planes) as 11 rows of three pairs,
     row-major. Each pair is titled "k* + o (o dz um)" with its offset $o = k - k^*$ and defocus $o\,\Delta z$, and
-    its status when it is not "ok". Nothing is drawn over an image, except on the plane $k^*$: two marks at
-    `marks["xy_um"]` (D-261.1) and a frame colour that singles the pair out; on that plane's profile two vertical
+    its status when it is not "ok". Nothing is drawn over an image, except on the plane $k^*$: the two thin segments
+    `marks["segments_um"]` (D-261.1, D-280; line width 0.8 pt, no marker) and a frame colour that singles the pair out; on that plane's profile two vertical
     lines at `marks["v_um"]`. A plane with `valid` False shows "not fetched" in place of its image. The figure's
     title is `title` or "cell <cell_id>, node <node_id> (<set>), Allen's diameter <D> um". With `zoom_half_um`
     given (amendment 1; the entry point passes `screening_near_half_um` for a far view, whose 22 um crop shows
@@ -2917,8 +2922,8 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
 - Test oracles (views built in the test as plain objects with `NodeView`'s fields; Block 61 is not imported): (S1)
   a near view gives 14 axes and a far view 66; each profile line's data equal `v_um` and `profile_gl[q]`, each
   dashed line's `background_gl[q]`, each image's array `stack[q]`; (S2) only the focus pair carries the marks: the
-  focus image has one artist set at `marks["xy_um"]`, its profile two vertical lines at `marks["v_um"]`, the other
-  axes none; (S3) every image shares `vmin`, `vmax` and every profile the y-range; (S4) the pair titles name the
+  focus image has two line artists whose data are `marks["segments_um"][0]` and `[1]`, without markers, its profile
+  two vertical lines at `marks["v_um"]`, the other axes none; (S3) every image shares `vmin`, `vmax` and every profile the y-range; (S4) the pair titles name the
   offsets $-3 \dots 3$ (near) and a non-ok status; (S5) `write_node_sheet` writes a non-empty PNG and leaves no
   open figure; (S6) a plane with `valid` False; a view whose `ks` do not contain `k_star` raises ValueError; (S7, amendment 1)
   with `zoom_half_um` a far view has 68 axes, the first pair shows `stack` at $k^*$ with x- and y-limits
@@ -2926,7 +2931,10 @@ the user chooses the calibration nodes on it (D-261.2) and returns them as Block
   $\pm$ `zoom_half_um`, both with the marks; the other 66 axes are as without it.
 - Data flow: consumes Block 61's `NodeView`, `diameter_marks`, `image_extent`; called by the entry point's step.
 - Confirmed: D-226.3, D-227.1, D-261.1 [user]; the layout is the orchestrator's.
-- Status: implemented 2026-11-27 by one implementer (wave 10), with amendment 1 (the zoomed focus pair of a far sheet); `test_smoke_screening_figures.py` 8 pass, 1 skip; the sheets seen on synthetic views only.
+- Status: implemented 2026-11-27 by one implementer (wave 10), with amendment 1 (the zoomed focus pair of a far sheet); `test_smoke_screening_figures.py` 8 pass, 1 skip; the sheets seen on synthetic views only. Amendment 2 (2026-11-28, D-280 [user], inline by the
+  orchestrator): Allen's diameter as two thin segments parallel to the heading (`marks["segments_um"]`), the circles
+  removed; the same counts; Block 61's `diameter_marks(view, length_um)` returns the segments
+  (`test_smoke_screening.py` 5 pass, 2 skip).
 
 Entry point (the orchestrator's, after Blocks 61 and 62): the step `screening` of `scripts/survey_cells.py` (after
 `calibration`): for every apt node of the cell it fetches the crop over the scan's planes, builds the view, writes

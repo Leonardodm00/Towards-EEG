@@ -382,6 +382,7 @@ class SurveyConfig:
     screening_near_half_um: float = 4.0     # source: PROVISIONAL (D-278 [orchestrator]): half-width (um) of a near-set node's image crop in the screening export (the near line reaches 3 um)
     screening_far_half_um: float = 11.0     # source: PROVISIONAL (D-278 [orchestrator]): half-width (um) of a far-set node's crop (the far line reaches 10 um)
     screening_dpi: int = 110                # source: PROVISIONAL (D-278 [orchestrator]): resolution of the screening sheets
+    screening_mark_length_um: float = 1.0   # source: D-280.2 [orchestrator], PROVISIONAL: length (um) of the two segments that mark Allen's diameter on the plane at focus (D-280.1 [user]: segments parallel to the heading)
     calib_pool_max_per_set: Optional[int] = None  # source: D-118.2 [user]: no cap on the pooled set (every cell's scans); an integer M restores the round-robin's cap of M (D-088.3: 30)
 
 

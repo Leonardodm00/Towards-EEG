@@ -328,7 +328,8 @@ def step_screening(ctx, cfg):
         patch = provider(left, top, width, height, int(ks[0]), int(ks[-1]))
         view = screening.node_view(sid, sc, rec, patch)
         zoom = float(cfg.survey.screening_near_half_um) if view.set == "far" else None
-        screening_figures.write_node_sheet(view, screening.diameter_marks(view), screening.image_extent(view),
+        screening_figures.write_node_sheet(view, screening.diameter_marks(view, float(cfg.survey.screening_mark_length_um)),
+                                           screening.image_extent(view),
                                            float(cfg.acquisition.dz_um),
                                            os.path.join(out_dir, "%s_%d.png" % (view.set, view.node_id)),
                                            int(cfg.survey.screening_dpi), zoom_half_um=zoom)

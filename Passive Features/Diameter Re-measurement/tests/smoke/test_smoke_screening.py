@@ -220,12 +220,24 @@ def test_known_answer():
     cx, cy, d = 812.37, 455.91, 1.7
     sc5, rec5 = make_scan(5, "near", 40, rng), make_record(5, "near", d)
     base = SC.node_view(CELL_ID, sc5, rec5, make_patch(sc5, rec5, cfg, rng))
-    m0 = SC.diameter_marks(_view_with(base, theta_rad=0.0))
+    L = 1.0   # um, the segments' length (D-280)
+    m0 = SC.diameter_marks(_view_with(base, theta_rad=0.0), L)
     assert m0["v_um"] == (-d / 2, d / 2), m0["v_um"]
     check_close("V2 theta 0", m0["xy_um"], [[cx, cy - d / 2], [cx, cy + d / 2]], rtol=0, atol=1e-12)
-    m1 = SC.diameter_marks(_view_with(base, theta_rad=math.pi / 2))
+    m1 = SC.diameter_marks(_view_with(base, theta_rad=math.pi / 2), L)
     check_close("V2 theta pi/2", m1["xy_um"], [[cx + d / 2, cy], [cx - d / 2, cy]], rtol=0, atol=1e-12)
     assert m1["xy_um"].shape == (2, 2) and m1["xy_um"].dtype == np.float64
+    # (V2, D-280) the segments: for theta = 0 the heading is +x, so the ends are (cx -+ L/2, cy -+ D/2 | cy + D/2)
+    check_close("V2 segments theta 0", m0["segments_um"],
+                [[[cx - L / 2, cy - d / 2], [cx + L / 2, cy - d / 2]], [[cx - L / 2, cy + d / 2], [cx + L / 2, cy + d / 2]]],
+                rtol=0, atol=1e-12)
+    assert m0["segments_um"].shape == (2, 2, 2) and m0["segments_um"].dtype == np.float64
+    for bad in (0.0, -1.0, float("nan"), float("inf")):
+        try:
+            SC.diameter_marks(base, bad)
+        except ValueError:
+            continue
+        raise AssertionError("length_um %r not refused" % (bad,))
 
 
 def test_reference():
@@ -265,8 +277,15 @@ def test_invariants():
     rec = make_record(9, "far", 3.1)
     v = SC.node_view(CELL_ID, sc, rec, make_patch(sc, rec, cfg, rng))
     for theta in np.linspace(-2 * math.pi, 2 * math.pi, 37):
-        m = SC.diameter_marks(_view_with(v, theta_rad=float(theta)))
+        m = SC.diameter_marks(_view_with(v, theta_rad=float(theta)), 0.8)
         xy = m["xy_um"]
+        seg = m["segments_um"]
+        head = np.array([math.cos(theta), math.sin(theta)])
+        for s_ in range(2):                                    # (V2, D-280) length, direction, midpoint
+            dvec = seg[s_, 1] - seg[s_, 0]
+            check_close("V2 segment length", np.hypot(*dvec), 0.8, rtol=0, atol=1e-12)
+            check_close("V2 segment along the heading", dvec / 0.8, head, rtol=0, atol=1e-12)
+            check_close("V2 segment midpoint", seg[s_].mean(axis=0), xy[s_], rtol=0, atol=1e-12)
         # (V2) float64 roundoff on coordinates ~1e3 um: |error| ~ 1e-13, tolerance 1e-12
         check_close("V2 distance", np.hypot(*(xy[1] - xy[0])), 3.1, rtol=0, atol=1e-12)
         check_close("V2 midpoint", xy.mean(axis=0), [v.cx_um, v.cy_um], rtol=0, atol=1e-12)
