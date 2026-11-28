@@ -332,6 +332,7 @@ the "Binds" column.
 | 2026-11-28 (the step-2 implementation chat, 00:30) | Logs **D-279** [orchestrator]: the screening export built and pushed (`70bc8a8` on `sci/diameter-pipeline`: SPEC Blocks 61 and 62, the step `screening`, the davinci run's commands in the davinci handoff's section 10; not run on real images); the second independent check of step 2's wave 1 (report `2026-11-27_2211`, PASS WITH ISSUES, no finding above NOTE) settled; the twins' noise SD does not map through the camera chain as D-275.5 assumed (0.5 to 1.2 gl in reads 0, 1.5 to 3 gl reads about 1.5 gl), for wave 2. The checks' spec tests committed (D-278.3). Next free IDs: D-280, I-008. |
 | 2026-11-28 (the step-2 implementation chat, 12:45) | Logs **D-280** (user): on the screening sheets Allen's diameter is drawn as two thin segments parallel to the node's heading, centred on D-261.1's two points, not as two circles. Next free IDs: D-281, I-008. |
 | 2026-11-28 (the step-2 implementation chat, 13:05) | Logs **D-281** (user): the davinci screening run covers all the cells of the archive (every `specimen_<id>` under `L<n>_exc` and `L<n>_inh`; 68 in the user's listing), not the 18 L3_exc cells of D-226.2's provisional reading and D-278.1; D-226 and D-278 annotated. Next free IDs: D-282, I-008. |
+| 2026-11-28 (the review chat, 13:13) | Logs **D-282** (user) after the twins' run `tw6` **[data inspected]**: the I_h fit has five parameters by default ($\Delta v_h = 0$); D-244 item 1's open point closed. The run `tw7` (inflated generating morphology) is recorded in the twins handoff's section 7; it carries no decision. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -601,6 +602,7 @@ would be needed*, *Status*.
 | D-279 | 2026-11-28 | SPEC 'The screening export' (Blocks 61, 62), `scripts/survey_cells.py` (the step `screening`), the davinci handoff's section 10; the report 2026-11-27_2211; D-270.2, D-275.5 | the export's build choices (the sheets' layout, crops of 4 and 11 um, a zoomed focus pair on far sheets, an opt-in step, the configuration in the scans file); step 2's second check settled; the twins' noise mapping is not yet D-270.2's and is rebuilt in wave 2 [orchestrator] | active; export built, not run on real images |
 | D-280 | 2026-11-28 | the screening sheets (SPEC Blocks 61, 62); D-261.1's marks | Allen's diameter is drawn as two short, thin segments parallel to the node's heading at $\pm D_{\rm A}/2$ across the branch, not as circles [user]; length 1.0 um, width 0.8 pt PROVISIONAL [orchestrator] | active |
 | D-281 | 2026-11-28 | the davinci screening run (the davinci handoff's section 10); D-226.2's reading, D-278.1's cell set; step 2's node lists | the screening export runs on every cell of the archive, each `specimen_<id>` under `L<n>_exc` and `L<n>_inh` (68 in the listing of 2026-11-28), not the 18 L3_exc cells [user]; selection by `cell_pool.py pick`, probe on the pilot 529878215, array `-J 0-67` [orchestrator] | active |
+| D-282 | 2026-11-28 | the I_h fit's arm (`run_ih_fit.py --arm`, `run_twin_recovery.py --ih-arm`); D-244 item 1, D-267, D-268 | five parameters by default, $\Delta v_h = 0$: on the ten noisy twins the six-parameter fit puts $\Delta v_h$ on the bound in 8 of 10 and triples the error of $\bar g_h$; the six-parameter arm stays as an opt-in comparison; the code's defaults not yet changed | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -17053,3 +17055,41 @@ the probe measures.
 D-098.5, D-124.2, D-226, D-274, D-278. **[run]** the stand-in test above.
 
 **Status:** active.
+
+## D-282 -- The I_h fit has five parameters by default: Delta v_h is not identifiable on the twins (user)
+
+**Date:** 2026-11-28, 13:13 (Europe/Rome), the review chat. **Binds:** the I_h fit's arm on the real cells and on the
+twins (`run_ih_fit.py --arm`, `run_twin_recovery.py --ih-arm`, `twin_manifest.py`, `submit_twin_recovery.sh`); D-244
+item 1, D-267, D-268.
+
+**Decision [user].** After the results of run `tw6`: "tw6: the sixth parameter is not identifiable. Perfect the
+default is then 5 parameters".
+
+**Statement.** (D-282.1) The I_h fit estimates $\theta = (C_m, R_m, R_a, \bar g_h, \kappa_\tau)$ with the half-activation
+shift fixed, $\Delta v_h = 0$ mV (arm `ih5`), on the real cells and on the twins. This closes the five-versus-six
+question D-244 item 1 left to the run D-268 asked for. (D-282.2) Five parameters is the default: the six-parameter arm
+(`ih6_d207`) stays in the code as an opt-in comparison. (D-282.3) [orchestrator] Until the code's defaults are changed
+(today `run_twin_recovery.py` `IH_ARM_DEFAULT = "ih6_d207"`, `run_ih_fit.py --arm` default `ih6`, at `sci/twins`
+`8b05c56`), every run passes the arm explicitly (`--ih-arm ih5`, `--arm ih5`); the change of the defaults is a code
+block of its own (SPEC 2.9 (d) and Block 21/22's entries first, then the suites that assert the default).
+
+**Why.** **[data inspected: the user's `tw6_results.tar.gz` and `tw5_results.tar.gz`; code `8b05c56`]** Ten noisy
+twins, six parameters, TRF refinement (run `tw6`): the estimate of $\Delta v_h$ is on the search bound ($\pm 10$ mV)
+in 8 of 10 twins and within the gate's 3 mV in 1 of 10 (median absolute error 5.6 mV); median $|\ln(\hat{\bar g}_h /
+\bar g_h)|$ is 0.58 against 0.17 with five parameters (run `tw5`), and for $\kappa_\tau$ 0.41 against 0.16; the passive
+parameters are unchanged (0.038, 0.059, 0.076 for $C_m$, $R_m$, $R_a$). The product $\bar g_h e^{\Delta v_h / k}$,
+$k = 8.05$ mV, is recovered with median absolute log error 0.21: the data fix the product, not its factors
+(**[reasoning]** for $m_\infty \ll 1$ only this product enters the current).
+
+**What it implies for code and tables.** The real cells' fit (D-267's budget) runs with `--arm ih5`. A table or figure
+from the six-parameter arm is labelled as a comparison.
+
+**What it does not decide.** Not tested: a five-parameter fit on twins whose truth has $\Delta v_h \neq 0$; if a real
+cell has such a shift, the five-parameter fit puts it into $\bar g_h$ (told to the user, 2026-11-28). `tw6`'s twins
+differ from `tw5`'s in the truths of $\Delta v_h$ and $\kappa_\tau$, so the two runs are compared, not paired. The
+value of $v_h$ itself (Rich et al. 2021 kinetics, D-206) is not re-examined.
+
+**Sources.** **[user]** 2026-11-28, 13:13; **[data inspected]** as above; **[log]** D-206, D-244, D-267, D-268; the
+twins handoff's section 7 (`4c9e20b`).
+
+**Status:** active; the code's defaults not yet changed (D-282.3).
