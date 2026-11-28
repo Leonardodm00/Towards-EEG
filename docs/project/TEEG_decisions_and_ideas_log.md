@@ -330,6 +330,7 @@ the "Binds" column.
 | 2026-11-27 (the step-2 implementation chat, night) | Logs **D-277** [orchestrator] (coding directive 7): Blocks 52 to 56 merged on `sci/diameter-pipeline` (`a67b4df`); the independent check (report `specs/test_reports/2026-11-27_1904_incremental.md`, PASS WITH ISSUES) settled -- the twin's scan without the goodness-of-fit screen; four smoke suites broken by `far_min_k_offset` = 4 being fixed; the oracle of Block 55 split (amendment 2); D-275.2's figures corrected (0.138 um, -6.07e-4 um$^2$ at 0.092 um); amendment 3 (`98df4b0`). D-275 annotated. Next free IDs: D-278, I-008. |
 | 2026-11-27 (the step-2 implementation chat, 22:45) | Logs **D-278** (user): the davinci screening export of D-226, D-227 and D-261 is built by the step-2 implementation chat, as the log describes it (SPEC Blocks 61 and 62, a step `screening` in the per-cell array); the independent check's spec tests are committed. The fixes of D-277 are merged (`fea7cbf` on `sci/diameter-pipeline`); a second independent check runs. Next free IDs: D-279, I-008. |
 | 2026-11-28 (the step-2 implementation chat, 00:30) | Logs **D-279** [orchestrator]: the screening export built and pushed (`70bc8a8` on `sci/diameter-pipeline`: SPEC Blocks 61 and 62, the step `screening`, the davinci run's commands in the davinci handoff's section 10; not run on real images); the second independent check of step 2's wave 1 (report `2026-11-27_2211`, PASS WITH ISSUES, no finding above NOTE) settled; the twins' noise SD does not map through the camera chain as D-275.5 assumed (0.5 to 1.2 gl in reads 0, 1.5 to 3 gl reads about 1.5 gl), for wave 2. The checks' spec tests committed (D-278.3). Next free IDs: D-280, I-008. |
+| 2026-11-28 (the step-2 implementation chat, 12:45) | Logs **D-280** (user): on the screening sheets Allen's diameter is drawn as two thin segments parallel to the node's heading, centred on D-261.1's two points, not as two circles. Next free IDs: D-281, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -597,6 +598,7 @@ would be needed*, *Status*.
 | D-277 | 2026-11-27 | SPEC Blocks 52 to 56, Block 4 amendment 4, Block 15 amendment on `sci/diameter-pipeline` (amendments 2 and 3); the report of 2026-11-27_1904; D-273.2, D-275, D-276 | the final check of step 2's wave 1 settled: a twin is scanned without the goodness-of-fit screen; the smoke suites follow `far_min_k_offset` = 4; Block 55's oracle split; D-275.2's figures corrected [orchestrator] | active; fixes with their implementers |
 | D-278 | 2026-11-27 | D-226's screening export on davinci (D-226.1-3, D-227.1, D-261.1); the spec tests of step 2's first check | the screening export is built by the step-2 implementation chat as the log describes it, on the 18 L3_exc cells; the selection returns as the CSV of D-275.3; the spec tests are committed [user] | active; not built |
 | D-279 | 2026-11-28 | SPEC 'The screening export' (Blocks 61, 62), `scripts/survey_cells.py` (the step `screening`), the davinci handoff's section 10; the report 2026-11-27_2211; D-270.2, D-275.5 | the export's build choices (the sheets' layout, crops of 4 and 11 um, a zoomed focus pair on far sheets, an opt-in step, the configuration in the scans file); step 2's second check settled; the twins' noise mapping is not yet D-270.2's and is rebuilt in wave 2 [orchestrator] | active; export built, not run on real images |
+| D-280 | 2026-11-28 | the screening sheets (SPEC Blocks 61, 62); D-261.1's marks | Allen's diameter is drawn as two short, thin segments parallel to the node's heading at $\pm D_{\rm A}/2$ across the branch, not as circles [user]; length 1.0 um, width 0.8 pt PROVISIONAL [orchestrator] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -16975,3 +16977,33 @@ check's report, the rerun of its reproduction; **[src]** `scripts/survey_cells.p
 D-261, D-270, D-275, D-277, D-278.
 
 **Status:** active; the export built and pushed (`70bc8a8`), not run on real images; the noise mapping for wave 2.
+
+---
+
+## D-280 -- On the screening sheets Allen's diameter is drawn as two thin segments parallel to the node's heading, not as two circles (user)
+
+**Date:** 2026-11-28, 12:45 (Europe/Rome), the step-2 implementation chat. **Binds:** the screening sheets (SPEC
+Blocks 61 and 62; `analysis/screening.py::diameter_marks`, `plotting/screening_figures.py`); D-261.1's marks.
+
+**Decision [user].** On the sample sheets: "In the screening sheet why to show the diameter you use two circles?
+use two small and thin segments parallell to the node's heading to show the allen's diameter."
+
+**Statement.** (D-280.1) On the image of the plane at focus (and on its zoomed copy on a far sheet) Allen's diameter
+$D_{{\rm A},i}$ is drawn as two short, thin segments parallel to the node's heading $(\cos\theta, \sin\theta)$,
+centred on the two points of D-261.1, $(c_x, c_y) \pm (D_{{\rm A},i}/2)\,(-\sin\theta, \cos\theta)$: they trace where
+the two walls of a tube of Allen's diameter lie [user]. The circles are removed. (D-280.2) The segments' length is
+`survey.screening_mark_length_um` = 1.0 um and their line width 0.8 pt, PROVISIONAL [orchestrator]; the two vertical
+lines at $v = \pm D_{{\rm A},i}/2$ on the profile stay.
+
+**Why.** **[user]**. The circles were the implementer's choice of marker where the contract said only "two marks";
+segments along the heading show the diameter as the image shows a dendrite, by its edges.
+
+**What it implies for code and tables.** `diameter_marks(view, length_um)` also returns `segments_um`, shape
+(2, 2, 2) (segment, end, (x, y)); the sheet draws them. Sheets already exported with circles (none on real data at
+this date) would be redrawn from the saved views (`screening_<sid>.npz`) without a new run.
+
+**What it does not decide.** The length and the width, if the user wants others.
+
+**Sources.** **[user]** 2026-11-28, 12:45. **[log]** D-261, D-278, D-279.
+
+**Status:** active.
