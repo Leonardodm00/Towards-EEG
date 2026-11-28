@@ -44,8 +44,13 @@ def _minf(v, dvh=0.0):
 
 
 def _plan(group, out, *extra):
+    # renewed 2026-11-28 (SPEC Block 30, D-282): the plan's default arm is ih5; these Block 22 checks are stated
+    # for a run on ih6_d207, so the arm is named unless the check names one
+    extra = list(extra)
+    if "--ih-arm" not in extra:
+        extra = ["--ih-arm", "ih6_d207"] + extra
     return rtr.main(["plan", "--group-dir", str(group["gdir"]), "--noise-dir", str(group["ndir"]), "--out", str(out)]
-                    + SMALL22 + list(extra))
+                    + SMALL22 + extra)
 
 
 # ============================================================================ Block 20, pure
@@ -136,7 +141,8 @@ def test_b20_eval_theta_six_names():
 def test_b22_plan_parser_defaults_and_gate_functions():
     ap = rtr.build_parser()
     a = ap.parse_args(["plan", "--group-dir", "g", "--noise-dir", "n", "--out", "o"])
-    assert a.ih_arm == "ih6_d207" and a.dvh_truth_range_mV == "-5,5"
+    # renewed 2026-11-28 (SPEC Block 30, D-282): the default arm is ih5 (was ih6_d207)
+    assert a.ih_arm == "ih5" and a.dvh_truth_range_mV == "-5,5"
     assert a.gbar_bounds == "1e-5,1e-3" and a.gbar_floor == 1e-5
     # updated 2026-11-25: SPEC Block 28, Fit options -- --refine accepts trf and it is the plan's default (was
     # nelder_mead, Block 22 Public API); --refine-max-nfev (30) recorded in the plan

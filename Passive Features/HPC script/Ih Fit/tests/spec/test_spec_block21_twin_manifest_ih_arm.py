@@ -91,7 +91,8 @@ def test_M2_defaults_with_range():
     real = _real()
     seed, n, n0 = 4, 6, 3
     kw = dict(ih_dvh_range_mV=(-5.0, 5.0), ih_gbar_floor_S_cm2=1e-5)
-    df = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=n0, seed=seed, truth_kwargs=kw)
+    df = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=n0, seed=seed, ih_arm="ih6_d207",
+                               truth_kwargs=kw)   # renewed 2026-11-28 (Block 30, D-282): the default arm is ih5; this check is stated for ih6_d207, named here
     exp_arm = {"full": "ih6_d207", "passive_fit": "passive_fullstep", "active_fit": "ih6_d207",
                "full_no_noise": "ih6_d207"}
     assert list(df["arm"]) == [exp_arm[c] for c in df["configuration"]]
@@ -122,13 +123,14 @@ def test_M2_defaults_with_range():
 
 
 def test_default_without_range_gives_zero_dvh():
-    df = tm.draw_twin_manifest(_real(), n_per_configuration=3, n_no_noise=1, seed=1)
+    df = tm.draw_twin_manifest(_real(), n_per_configuration=3, n_no_noise=1, seed=1, ih_arm="ih6_d207")   # renewed 2026-11-28 (Block 30, D-282): the default arm is ih5; this check is stated for ih6_d207, named here
     assert set(df["arm"]) == {"ih6_d207", "passive_fullstep"}
     assert np.all(df["ih_dvh_mV"].to_numpy(dtype=float) == 0.0)
 
 
 def test_float_dvh_sets_every_ih_row_and_active_stays_zero():
     df = tm.draw_twin_manifest(_real(), n_per_configuration=3, n_no_noise=2, seed=1, dvh_truth_mV=2.5,
+                               ih_arm="ih6_d207",   # renewed 2026-11-28 (Block 30, D-282): the default arm is ih5; this check is stated for ih6_d207, named here
                                truth_kwargs=dict(ih_dvh_range_mV=(-5.0, 5.0)))
     has = df["configuration"].map(tm.HAS_IH).to_numpy(dtype=bool)
     assert np.all(df.loc[has, "ih_dvh_mV"] == 2.5)
@@ -154,7 +156,7 @@ def test_M4_unknown_arm(bad):
 
 
 def test_M5_round_trip(tmp_path):
-    df = tm.draw_twin_manifest(_real(), n_per_configuration=4, n_no_noise=2, seed=9,
+    df = tm.draw_twin_manifest(_real(), n_per_configuration=4, n_no_noise=2, seed=9, ih_arm="ih6_d207",   # renewed 2026-11-28 (Block 30, D-282): the default arm is ih5; this check is stated for ih6_d207, named here
                                truth_kwargs=dict(ih_dvh_range_mV=(-5.0, 5.0)))
     p = tmp_path / "m.csv"
     tm.save_twin_manifest(df, p)

@@ -76,6 +76,10 @@ Checks
     Block 22 (SPEC 2.9; the default run's I_h arm is ih6_d207: TS1, TS2, TS5, TS7, TS9, TS11-TS13 adapted)
     test_T1_plan_ih6_d207      plan with defaults: arms and dv_h truths as Block 21's M2; the gate arm and axes
     test_T2_plan_ih5           plan --ih-arm ih5: arms ih5, dv_h 0, gate axes Cm, gbar, kappa_tau
+    Block 30 (D-282; the plan's default arm is ih5; _plan names ih6_d207 for the checks above)
+    test_B30_default_plan_is_ih5            plan with defaults = the ih5 plan; the fit's --arm default ih5
+    test_B30_ih5_on_twins_with_dvh_truth    --ih5-dvh-truth-range-mV: the ih6_d207 truths, the refusals,
+                                            the twin built with its dv_h and fitted with five names
     test_T3_fit_argv_workers   fit_argv's refinement options and gbar box, accepted by run_ih_fit's parser;
                                twin --n-workers 2 passes it; another --n-workers does not refit a finished twin
     test_T4_refusals           the gbar floor outside the gbar box, the dv_h range outside the dv_h box: exit 3
@@ -184,7 +188,7 @@ PLAN_OPTION_NAMES = ("seed", "id_base", "ra_mode", "cm_phys_lo", "cm_phys_hi", "
                      "lenient_rails", "drop_railed")
 #: Block 17's and Block 22's new options and defaults; the options Block 17 removes
 NEW_DEFAULTS = {"n_no_noise": 5, "gbar_bounds": "1e-5,1e-3", "tau_h_pk_bounds_ms": "50,1000",
-                "tau_h_pk_truth_ms": "150,700", "gbar_floor": 1e-5, "ih_arm": "ih6_d207",
+                "tau_h_pk_truth_ms": "150,700", "gbar_floor": 1e-5, "ih_arm": "ih5",   # Block 30: was ih6_d207
                 "dvh_truth_range_mV": "-5,5", "refine": "trf", "refine_starts": 3, "refine_maxfev": 100,
                 "refine_max_nfev": 30}    # Block 28: refine trf (was nelder_mead), refine_max_nfev 30
 REMOVED_OPTIONS = ("--kappa-bounds=0.5,2.0", "--kappa-range=0.7,1.4", "--dvh-range=-5,5")
@@ -249,10 +253,16 @@ def _run(argv):
     return code, out.getvalue(), err.getvalue()
 
 
-def _plan(out, *extra):
+def _plan(out, *extra, default_arm=False):
+    """plan on the fixture. Renewed 2026-11-28 (Block 30, D-282): the plan's default arm is now ih5; the
+    checks of Blocks 8 to 28 were written for a default run on ih6_d207, so this helper names that arm
+    unless the caller names one (--ih-arm in extra) or asks for the plan's own default (default_arm=True)."""
     st = _fixture()
+    extra = list(extra)
+    if not default_arm and "--ih-arm" not in extra:
+        extra = ["--ih-arm", "ih6_d207"] + extra
     return _run(["plan", "--group-dir", st["group_dir"], "--noise-dir", st["noise_dir"], "--out", out]
-                + SMALL + list(extra))
+                + SMALL + extra)
 
 
 def _sub(args, timeout=1800):
@@ -1909,6 +1919,94 @@ def test_T8_bash_ascii_lf():
                        stderr=subprocess.PIPE, universal_newlines=True)
     bad = [n for n in OWN_FILES if (b"\r" in (HERE / n).read_bytes() or any(b > 127 for b in (HERE / n).read_bytes()))]
     assert r.returncode == 0 and not bad, "bash -n: %d %s; not ASCII/LF: %s" % (r.returncode, r.stderr, bad)
+
+
+def test_B30_default_plan_is_ih5():
+    """B30a (Block 30, D-282): plan with its own defaults is the ih5 plan -- same manifest, same options -- and a
+    plain ih5 plan carries no ih5_dvh_truth_range_mV key."""
+    import run_ih_fit as R
+    import run_twin_recovery as T
+    a, b = _new_out("b30a"), _new_out("b30b")
+    ca, _, sa = _plan(a, default_arm=True)
+    cb, _, sb = _plan(b, "--ih-arm", "ih5")
+    assert ca == 0 and cb == 0, (sa, sb)
+    ma, mb = _manifest(a), _manifest(b)
+    oa = json.loads((a / "run_config.json").read_text())["options"]
+    ob = json.loads((b / "run_config.json").read_text())["options"]
+    parts = {"T.IH_ARM_DEFAULT is ih5 and run_ih_fit's --arm default is ih5": (
+        T.IH_ARM_DEFAULT == "ih5"
+        and R._parse_args(["--archive-dir", "-", "--output-dir", "-", "--code-dir", "-"]).arm == "ih5")}
+    parts["the default plan's manifest equals the ih5 plan's"] = ma.equals(mb)
+    parts["the default plan's options equal the ih5 plan's; ih_arm ih5; no ih5_dvh_truth_range_mV key"] = (
+        oa == ob and oa["ih_arm"] == "ih5" and "ih5_dvh_truth_range_mV" not in oa)
+    parts["arms ih5 / passive_fullstep; dv_h truth 0 in every row"] = (
+        all(str(x) == EXPECTED_ARM_IH5[str(c)] for x, c in zip(ma["arm"], ma["configuration"]))
+        and bool((ma["ih_dvh_mV"] == 0.0).all()))
+    _fail_parts(parts)
+
+
+def test_B30_ih5_on_twins_with_dvh_truth():
+    """B30b (Block 30): plan --ih-arm ih5 --ih5-dvh-truth-range-mV=-5,5 draws the truths of the ih6_d207 plan
+    (every column but arm), records the option, is refused with ih6_d207 (2), outside the box (3) and malformed
+    (2); the full twin is built with its non-zero dv_h and fitted with the five names."""
+    import run_twin_recovery as T
+    import twin_manifest as TM
+    five, six = _new_out("b30f"), _new_out("b30s")
+    c5, _, s5 = _plan(five, "--ih-arm", "ih5", "--ih5-dvh-truth-range-mV=-5,5")
+    c6, _, s6 = _plan(six, "--ih-arm", "ih6_d207")
+    assert c5 == 0 and c6 == 0, (s5, s6)
+    m5, m6 = _manifest(five), _manifest(six)
+    cfg = json.loads((five / "run_config.json").read_text())
+    has_ih = m5["configuration"].map(TM.HAS_IH).to_numpy(dtype=bool)
+    parts = {"every manifest column but arm equals the ih6_d207 plan's (same truths, ids, seeds)": (
+        list(m5.columns) == list(m6.columns) and m5.drop(columns=["arm"]).equals(m6.drop(columns=["arm"])))}
+    parts["arms ih5 / passive_fullstep; the dv_h truth of every twin with I_h is non-zero and inside [-5, 5]"] = (
+        all(str(x) == EXPECTED_ARM_IH5[str(c)] for x, c in zip(m5["arm"], m5["configuration"]))
+        and bool(((m5.loc[has_ih, "ih_dvh_mV"] != 0.0) & (m5.loc[has_ih, "ih_dvh_mV"].abs() <= 5.0)).all())
+        and bool((m5.loc[~has_ih, "ih_dvh_mV"] == 0.0).all()))
+    parts["run_config.json: the option recorded, the drawer's range [-5, 5], dvh_truth_mV null, the gate on ih5"] = (
+        cfg["options"].get("ih5_dvh_truth_range_mV") == "-5,5" and cfg["options"]["ih_arm"] == "ih5"
+        and cfg["truth_kwargs"]["ih_dvh_range_mV"] == [-5.0, 5.0] and cfg.get("dvh_truth_mV") is None
+        and cfg.get("gate_arm") == "ih5" and cfg.get("gate_required_axes") == ["Cm", "gbar", "kappa_tau"])
+    # refusals
+    out = _new_out("b30r1")
+    code, _, se = _plan(out, "--ih-arm", "ih6_d207", "--ih5-dvh-truth-range-mV=-5,5")
+    parts["refused (2), nothing written: the option with ih6_d207"] = (
+        code == 2 and not out.exists() and "--ih5-dvh-truth-range-mV" in se)
+    for what, rng in (("below the box", "-12,5"), ("above the box", "-5,11")):
+        out = _new_out("b30r2")
+        code, _, se = _plan(out, "--ih-arm", "ih5", "--ih5-dvh-truth-range-mV=%s" % rng)
+        parts["refused (3), nothing written: the range %s" % what] = code == 3 and not out.exists()
+    out = _new_out("b30r3")
+    code, _, se = _plan(out, "--ih-arm", "ih5", "--ih5-dvh-truth-range-mV=abc")
+    parts["refused (2), nothing written: a malformed range"] = code == 2 and not out.exists()
+    code, _, se = _plan(five, "--ih-arm", "ih5")
+    parts["a re-plan of the same directory without the option: refused (3), the option named"] = (
+        code == 3 and "ih5_dvh_truth_range_mV" in se)
+    # the truth the fit is told and the truth the twin is built with
+    row = m5[m5["configuration"] == "full"].iloc[0]
+    tid = int(row["specimen_id"])
+    ev = T.eval_theta_of(row, "ih5")
+    parts["eval_theta_of: the five names, no dv_h"] = (
+        ev is not None and [kv.split("=")[0] for kv in ev.split(",")] == list(IH5))
+    parts["twin_theta holds the manifest's non-zero dv_h (what the build applies)"] = (
+        float(TM.twin_theta(row)["dv_h"]) == float(row["ih_dvh_mV"]) != 0.0)
+    p = _sub(["twin", "--out", five, "--twin", tid])
+    meta = json.loads((five / "twins" / ("twin_%d" % tid) / ("specimen_%d" % tid) / "metadata.json").read_text())
+    argv = json.loads((five / "fits" / ("twin_%d" % tid) / "fit_argv.json").read_text())["argv"]
+    res = pd.read_csv(five / "fits" / ("twin_%d" % tid) / "phase2_results.csv")
+    r = res[res["specimen_id"] == tid]
+    evs = [a for a in argv if str(a).startswith("--eval-theta=")]
+    parts["the twin job: exit 0; the archive's theta holds the manifest's dv_h"] = (
+        p.returncode == 0 and float(meta["twin"]["theta"]["dv_h"]) == float(row["ih_dvh_mV"]))
+    parts["the fit: --arm ih5, --eval-theta with the five names, the fitted names the five"] = (
+        argv[argv.index("--arm") + 1] == "ih5" and len(evs) == 1
+        and [kv.split("=")[0] for kv in evs[0][len("--eval-theta="):].split(",")] == list(IH5)
+        and len(r) == 1 and tuple(str(r["param_names"].iloc[0]).split("|")) == tuple(IH5))
+    # a second twin job reuses the archive (the manifest's theta is the archive's)
+    p2 = _sub(["twin", "--out", five, "--twin", tid])
+    parts["a second twin job keeps the archive (not rebuilt)"] = p2.returncode == 0 and "not rebuilt" in (p2.stdout + p2.stderr)
+    _fail_parts(parts)
 
 
 def test_convergence():

@@ -82,7 +82,7 @@ def test_first_rows_equal_base_code(seed, n, n0):
     assert old.loc[old["configuration"] == "full", "ih_dvh_mV"].abs().max() > 0   # the draw had nonzero dv_h
     # dvh_truth_mV=None: the drawn dv_h bit for bit
     keep = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=n0, seed=seed, dvh_truth_mV=None,
-                                 truth_kwargs=KW)
+                                 ih_arm="ih6_d207", truth_kwargs=KW)   # renewed 2026-11-28 (Block 30, D-282): the default arm is ih5; this check is stated for ih6_d207, named here
     assert_array_equal(keep["ih_dvh_mV"].to_numpy()[:3 * n], old["ih_dvh_mV"].to_numpy())
     # another value is set on every row with I_h, the paired rows included
     sh = tm.draw_twin_manifest(real, n_per_configuration=n, n_no_noise=n0, seed=seed, dvh_truth_mV=-2.5,

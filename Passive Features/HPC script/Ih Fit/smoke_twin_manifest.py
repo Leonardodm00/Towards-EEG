@@ -50,7 +50,7 @@ Block 21 (the run's I_h arm; oracles M1-M7 of the entry)
          commit's twin_manifest.py (CONTRACT_COMMIT_B21, read with git show and
          imported under another name) exactly (assert_frame_equal), for several
          seeds, n, n_no_noise and truth kwargs
-    M2   default arguments with ih_dvh_range_mV = (-5, 5): arm ih6_d207 in
+    M2   ih_arm ih6_d207 (named since Block 30) with ih_dvh_range_mV = (-5, 5): arm ih6_d207 in
          full, active_fit, full_no_noise and passive_fullstep in passive_fit;
          the dv_h truths of the rows with I_h lie in [-5, 5], are not all equal
          and equal synth_gt_grid.draw_manifest's for the same seeds; active_fit
@@ -86,6 +86,7 @@ Keep this file pure ASCII.
 from __future__ import annotations
 
 import contextlib
+import functools
 import importlib.metadata
 import io
 import platform
@@ -158,15 +159,17 @@ def quiet(fn, *a, **k):
 
 
 _DEFAULT = object()
+#: the six-parameter arm, named explicitly since Block 30 (the default is ih5)
+SIX = "ih6_d207"
 
 
 def manifest(seed=SEED, real=None, n=N, n0=_DEFAULT, dvh=_DEFAULT, arm=_DEFAULT, **tk):
     """draw_twin_manifest at the entry's defaults for n_no_noise, dvh_truth_mV
     and ih_arm unless given (n0, dvh, arm)."""
     real = make_real_cells() if real is None else real
-    kw = {}
-    if arm is not _DEFAULT:
-        kw["ih_arm"] = arm
+    # renewed 2026-11-28 (Block 30, D-282): the module's default arm is now ih5, which refuses the dv_h
+    # range these checks draw with; they were written for ih6_d207 and name it (SIX) unless arm is given
+    kw = {"ih_arm": SIX if arm is _DEFAULT else arm}
     if n0 is not _DEFAULT:
         kw["n_no_noise"] = n0
     if dvh is not _DEFAULT:
@@ -330,7 +333,7 @@ def test_tm6_arms_theta_spec():
                          "full_no_noise": "ih5"}, TM.ARM_OF
     assert TM.HAS_IH == {"full": True, "passive_fit": True, "active_fit": False, "full_no_noise": True}
     assert TM.WITH_NOISE == {"full": True, "passive_fit": True, "active_fit": True, "full_no_noise": False}
-    # [Block 21, M6] the default arm is ih6_d207: arm = arm_of(conf, "ih6_d207")
+    # [Block 21, M6; Block 30] base_manifest() names ih6_d207: arm = arm_of(conf, "ih6_d207")
     assert (m["arm"] == m["configuration"].map(lambda c: TM.arm_of(c, "ih6_d207"))).all()
     names6 = {"Cm": "cm_true", "Rm": "rm_true", "Ra": "ra_true",
               "gbar": "ih_gihbar_S_cm2", "dv_h": "ih_dvh_mV", "kappa_tau": "ih_kappa_tau"}
@@ -374,7 +377,7 @@ def _raises(fn, *a, **k):
 
 def test_tm8_refusals():
     real = make_real_cells()
-    f = TM.draw_twin_manifest
+    f = functools.partial(TM.draw_twin_manifest, ih_arm=SIX)   # Block 30: see manifest()
     bad = []
 
     def expect(label, *a, **k):
@@ -582,14 +585,14 @@ def test_tm12_no_noise_rows():
     real = make_real_cells()
     bad = []
     for v in (-1, N + 1, 2.5, True, "3", None):
-        if not _raises(TM.draw_twin_manifest, real, n_per_configuration=N, n_no_noise=v,
+        if not _raises(TM.draw_twin_manifest, real, n_per_configuration=N, n_no_noise=v, ih_arm=SIX,
                        truth_kwargs=truth_kwargs()):
             bad.append(v)
-    if not _raises(TM.draw_twin_manifest, real, n_per_configuration=2, n_no_noise=3,
+    if not _raises(TM.draw_twin_manifest, real, n_per_configuration=2, n_no_noise=3, ih_arm=SIX,
                    truth_kwargs=truth_kwargs()):
         bad.append("n0=3 > n=2")
     # the default n_no_noise = 5 with n_per_configuration = 4 is the same refusal
-    if not _raises(TM.draw_twin_manifest, real, n_per_configuration=4, truth_kwargs=truth_kwargs()):
+    if not _raises(TM.draw_twin_manifest, real, n_per_configuration=4, ih_arm=SIX, truth_kwargs=truth_kwargs()):
         bad.append("default 5 > n=4")
     assert not bad, "n_no_noise not refused: {}".format(bad)
 
@@ -631,11 +634,11 @@ def test_m1_ih5_reproduces_contract():
         assert (new["arm"] != "ih6_d207").all()
 
 
-def test_m2_default_arm_and_drawn_dvh():
+def test_m2_six_arm_and_drawn_dvh():   # renamed 2026-11-28 (Block 30): ih6_d207 is no longer the default
     import synth_gt_grid as G
     floor = 1e-5
     tk = truth_kwargs(ih_dvh_range_mV=(-5, 5), ih_gbar_range_S_cm2=(2e-5, 3e-4), ih_gbar_floor_S_cm2=floor)
-    m = quiet(TM.draw_twin_manifest, make_real_cells(), truth_kwargs=tk)   # every option at its default
+    m = quiet(TM.draw_twin_manifest, make_real_cells(), ih_arm=SIX, truth_kwargs=tk)   # every other option at its default
     assert len(m) == 3 * N + N0
     exp_arm = {"full": "ih6_d207", "passive_fit": "passive_fullstep", "active_fit": "ih6_d207",
                "full_no_noise": "ih6_d207"}
@@ -663,10 +666,10 @@ def test_m2_default_arm_and_drawn_dvh():
         for col in TRUTH_COLS + ("tau_m_true_ms", "F"):
             assert nn.loc[i, col] == full.loc[i, col], (i, col)
     # a float dvh_truth_mV still sets every row with I_h (and not active_fit)
-    m3 = quiet(TM.draw_twin_manifest, make_real_cells(), dvh_truth_mV=3.0, truth_kwargs=tk)
+    m3 = quiet(TM.draw_twin_manifest, make_real_cells(), ih_arm=SIX, dvh_truth_mV=3.0, truth_kwargs=tk)
     assert (m3.loc[has_ih, "ih_dvh_mV"] == 3.0).all() and (m3.loc[~has_ih, "ih_dvh_mV"] == 0.0).all()
     # without the range the drawer gives 0
-    m0 = quiet(TM.draw_twin_manifest, make_real_cells(), truth_kwargs=dict(tk, ih_dvh_range_mV=None))
+    m0 = quiet(TM.draw_twin_manifest, make_real_cells(), ih_arm=SIX, truth_kwargs=dict(tk, ih_dvh_range_mV=None))
     assert (m0["ih_dvh_mV"] == 0.0).all()
     assert (m0["arm"] == m["arm"]).all()
 
@@ -718,7 +721,7 @@ def test_m4_ih_arm_names_and_arm_of():
 
 def test_m5_round_trip_new_manifest():
     tk = truth_kwargs(ih_dvh_range_mV=(-5, 5), ih_gbar_floor_S_cm2=1e-5)
-    m = quiet(TM.draw_twin_manifest, make_real_cells(), truth_kwargs=tk)
+    m = quiet(TM.draw_twin_manifest, make_real_cells(), ih_arm=SIX, truth_kwargs=tk)
     assert (m["arm"] == "ih6_d207").sum() == 2 * N + N0
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "twin_manifest.csv"
@@ -730,6 +733,50 @@ def test_m5_round_trip_new_manifest():
     assert list(back.dtypes) == list(m.dtypes)
     assert_frame_equal(back, m, check_exact=True)
     assert back["ih_dvh_mV"].to_numpy().tobytes() == m["ih_dvh_mV"].to_numpy().tobytes()
+
+
+def test_b30_default_arm_is_ih5():
+    """Block 30 (D-282): the default arm is ih5; a default call with a dv_h range is refused, without it
+    every dv_h truth is 0 and every arm but passive_fit's is ih5."""
+    assert TM.DEFAULT_IH_ARM == "ih5", TM.DEFAULT_IH_ARM
+    real = make_real_cells()
+    assert _raises(TM.draw_twin_manifest, real, truth_kwargs=truth_kwargs(ih_dvh_range_mV=(-5, 5)))
+    m = quiet(TM.draw_twin_manifest, real, truth_kwargs=truth_kwargs(ih_dvh_range_mV=None))
+    exp = quiet(TM.draw_twin_manifest, real, ih_arm="ih5", truth_kwargs=truth_kwargs(ih_dvh_range_mV=None))
+    assert_frame_equal(m, exp, check_exact=True)
+    assert set(m["arm"]) == {"ih5", "passive_fullstep"} and (m["ih_dvh_mV"] == 0.0).all()
+
+
+def test_b30_allow_dvh_truth_with_ih5():
+    """Block 30: allow_dvh_truth_with_ih5=True lifts the refusal and nothing else -- the frame is the
+    ih6_d207 frame of the same arguments in every column but arm; False refuses; a non-bool is refused;
+    without a range the flag changes nothing."""
+    real = make_real_cells()
+    for seed, rng in ((SEED, (-5, 5)), (3, (-8.0, 2.0))):
+        tk = truth_kwargs(ih_dvh_range_mV=rng, ih_gbar_floor_S_cm2=1e-5)
+        six = quiet(TM.draw_twin_manifest, real, seed=seed, ih_arm=SIX, truth_kwargs=tk)
+        five = quiet(TM.draw_twin_manifest, real, seed=seed, ih_arm="ih5", allow_dvh_truth_with_ih5=True,
+                     truth_kwargs=tk)
+        assert list(five.columns) == list(six.columns)
+        assert_frame_equal(five.drop(columns=["arm"]), six.drop(columns=["arm"]), check_exact=True)
+        assert five["arm"].tolist() == [TM.arm_of(c, "ih5") for c in five["configuration"]]
+        has_ih = five["configuration"].map(TM.HAS_IH).to_numpy(dtype=bool)
+        dv = five.loc[has_ih, "ih_dvh_mV"].to_numpy(dtype=float)
+        assert np.all(dv != 0.0) and len(np.unique(dv)) > 1, dv
+        assert (five.loc[~has_ih, "ih_dvh_mV"] == 0.0).all()
+        assert _raises(TM.draw_twin_manifest, real, seed=seed, ih_arm="ih5", truth_kwargs=tk)
+        assert _raises(TM.draw_twin_manifest, real, seed=seed, ih_arm="ih5", allow_dvh_truth_with_ih5=False,
+                       truth_kwargs=tk)
+    tk0 = truth_kwargs(ih_dvh_range_mV=None)
+    a = quiet(TM.draw_twin_manifest, real, ih_arm="ih5", truth_kwargs=tk0)
+    b = quiet(TM.draw_twin_manifest, real, ih_arm="ih5", allow_dvh_truth_with_ih5=True, truth_kwargs=tk0)
+    assert_frame_equal(a, b, check_exact=True)
+    for v in (1, 0, "yes", None):
+        assert _raises(TM.draw_twin_manifest, real, ih_arm="ih5", allow_dvh_truth_with_ih5=v, truth_kwargs=tk0), v
+    # the six-parameter arm ignores the flag
+    c = quiet(TM.draw_twin_manifest, real, ih_arm=SIX, allow_dvh_truth_with_ih5=True, truth_kwargs=truth_kwargs())
+    d = quiet(TM.draw_twin_manifest, real, ih_arm=SIX, truth_kwargs=truth_kwargs())
+    assert_frame_equal(c, d, check_exact=True)
 
 
 _EXISTING = ("test_tm1_counts_and_order", "test_tm2_cells", "test_tm3_seeds", "test_tm4_truths_reference",

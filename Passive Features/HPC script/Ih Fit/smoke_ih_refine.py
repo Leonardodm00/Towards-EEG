@@ -223,8 +223,9 @@ def test_F1_arm_table():
                        ("gbar_bounds", "1e-5,1e-3"), ("dvh_bounds", "-10.0,10.0"), ("arm", "ih6_d207")):
         if getattr(p, name) != want:
             bad.append("default --%s = %r, not %r" % (name.replace("_", "-"), getattr(p, name), want))
-    if _parse([]).arm != "ih6":
-        bad.append("the default --arm changed")
+    # renewed 2026-11-28 (Block 30, D-282): the default arm is ih5 (was ih6)
+    if _parse([]).arm != "ih5":
+        bad.append("the default --arm is not ih5")
     # overrides
     for arm in expect:
         for val in ("none", "nelder_mead"):

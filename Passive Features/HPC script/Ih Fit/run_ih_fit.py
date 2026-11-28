@@ -2075,8 +2075,9 @@ def _parse_args(argv):
     ap.add_argument("--fail-fast", action="store_true")
 
     # --- arm and parameter vector ------------------------------------------
-    ap.add_argument("--arm", default="ih6", choices=sorted(ARMS),
-                    help="Named configuration (default ih6).")
+    ap.add_argument("--arm", default="ih5", choices=sorted(ARMS),
+                    help="Named configuration (default ih5: five parameters, D-282, SPEC Block 30; "
+                         "ih6 and ih6_d207 are labelled comparisons).")
     ap.add_argument("--fit-params", default=None,
                     help="Override the arm's axes, e.g. 'Cm,Rm,Ra,gbar' for "
                          "the 4-D arm. Omitted kinetic knobs are FROZEN at "

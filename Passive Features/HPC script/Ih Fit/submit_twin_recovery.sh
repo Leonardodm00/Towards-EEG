@@ -65,9 +65,11 @@
 #                    --gbar-bounds (1e-6,1e-2), --tau-h-pk-bounds-ms LO,HI (50,1000: the box of tau_h_pk, ms)
 #                    and --tau-h-pk-truth-ms LO,HI (150,700: the range of its truth, ms), which replace
 #                    --kappa-bounds and --kappa-range; --dvh-range is gone. Block 22's plan options
-#                    (SPEC 2.9): --ih-arm ih6_d207|ih5 (ih6_d207: six parameters, dv_h fitted; pass
-#                    --ih-arm ih5 for the five-parameter arm), --dvh-truth-range-mV=LO,HI (-5,5: the
-#                    range of dv_h's truth under ih6_d207; 0 under ih5), --gbar-bounds (now 1e-5,1e-3),
+#                    (SPEC 2.9): --ih-arm ih5|ih6_d207 (ih5, the default since Block 30, D-282: five
+#                    parameters; ih6_d207: six, dv_h fitted, a labelled comparison),
+#                    --dvh-truth-range-mV=LO,HI (-5,5: the range of dv_h's truth under ih6_d207; 0 under
+#                    ih5 unless --ih5-dvh-truth-range-mV=LO,HI is given, Block 30: twins with a dv_h
+#                    truth fitted with five parameters), --gbar-bounds (now 1e-5,1e-3),
 #                    --gbar-floor (1e-5), --refine none|nelder_mead|trf, --refine-starts (3),
 #                    --refine-maxfev (100, nelder_mead only). Block 28 (SPEC 2.10 (c)): --refine
 #                    defaults to trf (was nelder_mead); --refine-max-nfev (30: trf's max_nfev per start)

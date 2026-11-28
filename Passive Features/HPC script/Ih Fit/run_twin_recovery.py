@@ -110,7 +110,7 @@ TOL_OPTIONS = ("tol_cm_factor", "tol_gbar_factor", "tol_dvh_mV", "tol_kappa_fact
 #: the run's I_h arm (Block 22, SPEC 2.9 (d)): the arm of every configuration but passive_fit
 #: (twin_manifest.arm_of); its default
 IH_ARM_CHOICES = ("ih5", "ih6_d207")
-IH_ARM_DEFAULT = "ih6_d207"
+IH_ARM_DEFAULT = "ih5"   # D-282, SPEC Block 30 (was "ih6_d207")
 #: the gate's required axes per I_h arm (SPEC 2.8 (g), 2.9 (f)): dv_h is not an axis of ih5, and its
 #: absence does not fail that gate; ih6_d207 is gated on dv_h too (D-011's 3 mV)
 _GATE_REQUIRED_AXES_OF = {"ih5": ("Cm", "gbar", "kappa_tau"), "ih6_d207": ("Cm", "gbar", "dv_h", "kappa_tau")}
@@ -352,7 +352,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dvh-truth-range-mV", default=DVH_TRUTH_RANGE_MV_DEFAULT,
                    help="'LO,HI' (mV): with --ih-arm ih6_d207 the truth of dv_h of a twin with I_h is drawn "
                         "uniformly in it (draw_manifest's ih_dvh_range_mV); must lie inside --dvh-bounds; "
-                        "not used with ih5 (dv_h's truth 0)")
+                        "not used with ih5 (dv_h's truth 0; see --ih5-dvh-truth-range-mV)")
+    p.add_argument("--ih5-dvh-truth-range-mV", dest="ih5_dvh_truth_range_mV", default=None,
+                   help="'LO,HI' (mV), only with --ih-arm ih5 (SPEC Block 30): the truth of dv_h of a twin with "
+                        "I_h is drawn uniformly in it, as under ih6_d207, while the fit keeps dv_h = 0 (a "
+                        "model error on purpose); must lie inside --dvh-bounds; absent = dv_h's truth 0")
     p.add_argument("--gbar-range", default=d["gbar_range"])
     p.add_argument("--tau-h-pk-truth-ms", default=TAU_H_PK_TRUTH_MS_DEFAULT,
                    help="'LO,HI' (ms): the range of the truth of tau_h_pk, drawn by draw_manifest's own law "
@@ -472,6 +476,14 @@ def plan_options(args) -> Dict[str, object]:
     if factor != 1.0:
         opts["twin_diam_factor"] = factor
         opts["twin_diam_max_path_um"] = max_path
+    # Block 30: recorded only when given (same reason); only the five-parameter arm takes it
+    rng5 = getattr(args, "ih5_dvh_truth_range_mV", None)
+    if rng5 is not None:
+        if str(opts["ih_arm"]) != "ih5":
+            raise Refused(EXIT_USAGE, "plan: --ih5-dvh-truth-range-mV is an option of --ih-arm ih5; with %s the "
+                                      "range of dv_h's truth is --dvh-truth-range-mV" % (opts["ih_arm"],))
+        _pair(rng5, "--ih5-dvh-truth-range-mV")
+        opts["ih5_dvh_truth_range_mV"] = str(rng5)
     return opts
 
 
@@ -521,10 +533,13 @@ def _pair(text, flag: str) -> tuple:
 
 def dvh_truth_of(o) -> tuple:
     """(ih_dvh_range_mV, dvh_truth_mV) of the plan's I_h arm (Block 22, SPEC 2.9 (d)): ih6_d207 ->
-    (the --dvh-truth-range-mV pair, None: the drawer's uniform draw kept); ih5 -> (None, 0.0)."""
+    (the --dvh-truth-range-mV pair, None: the drawer's uniform draw kept); ih5 -> (None, 0.0), or, when the
+    plan names --ih5-dvh-truth-range-mV (Block 30), (that pair, None)."""
     if str(o["ih_arm"]) == "ih6_d207":
         return _pair(o["dvh_truth_range_mV"], "--dvh-truth-range-mV"), None
     if str(o["ih_arm"]) == "ih5":
+        if o.get("ih5_dvh_truth_range_mV") is not None:
+            return _pair(o["ih5_dvh_truth_range_mV"], "--ih5-dvh-truth-range-mV"), None
         return None, DVH_TRUTH_MV_IH5
     raise Refused(EXIT_USAGE, "plan: unknown --ih-arm %r" % (o["ih_arm"],))
 
@@ -542,7 +557,7 @@ def check_boxes(o) -> None:
     if rng is not None:
         d_lo, d_hi = _pair(o["dvh_bounds"], "--dvh-bounds")
         if not (d_lo <= rng[0] and rng[1] <= d_hi):
-            raise Refused(EXIT_REFUSED, "plan: --dvh-truth-range-mV [%r, %r] lies outside the dv_h box "
+            raise Refused(EXIT_REFUSED, "plan: the range of dv_h's truth [%r, %r] lies outside the dv_h box "
                                         "--dvh-bounds [%r, %r] (SPEC 2.9 (d))" % (rng[0], rng[1], d_lo, d_hi))
 
 
@@ -676,7 +691,9 @@ def cmd_plan(args) -> int:
         manifest = TM.draw_twin_manifest(real_cells[list(TM.REAL_CELL_COLUMNS)], n_per_configuration=n,
                                          n_no_noise=int(opts["n_no_noise"]), seed=int(opts["seed"]),
                                          id_base=int(opts["id_base"]), ih_arm=str(opts["ih_arm"]),
-                                         dvh_truth_mV=dvh_truth_mV, truth_kwargs=truth_kwargs_of(opts, tau_rec))
+                                         dvh_truth_mV=dvh_truth_mV,
+                                         allow_dvh_truth_with_ih5=opts.get("ih5_dvh_truth_range_mV") is not None,
+                                         truth_kwargs=truth_kwargs_of(opts, tau_rec))
     except ValueError as exc:
         raise Refused(EXIT_REFUSED, "plan: refused by the manifest (Block 13): %s" % exc)
 
