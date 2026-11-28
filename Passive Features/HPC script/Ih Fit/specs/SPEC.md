@@ -1702,7 +1702,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   - `IH_ARMS = ("ih5", "ih6_d207")`; `arm_of(configuration: str, ih_arm: str) -> str`: `passive_fit` ->
     `"passive_fullstep"`, every other configuration -> `ih_arm`; unknown names: ValueError. `ARM_OF` stays as it is
     (the `ih5` table), for the code that reads it.
-  - `draw_twin_manifest(..., ih_arm: str = "ih6_d207", dvh_truth_mV: Optional[float] = None, ...)`: the `arm` column
+  - `draw_twin_manifest(..., ih_arm: str = "ih6_d207" [since Block 30, D-282: "ih5"], dvh_truth_mV: Optional[float] = None, ...)`: the `arm` column
     is `arm_of(configuration, ih_arm)`. `dvh_truth_mV=None` keeps the drawer's values in the rows with I_h (drawn
     when `truth_kwargs` carries `ih_dvh_range_mV`, else 0); a float sets it in every row with I_h, as today. With
     `ih_arm="ih5"` a row with I_h whose dv_h truth is not 0 is refused (ValueError naming the option): that arm's
@@ -2176,7 +2176,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 - Data flow: Blocks 13, 21, 22; the reports are read as before.
 - Confirmed: yes -- the user, 2026-11-28 (D-282: "the default is then 5 parameters"; 13:25: "Update and go on", and
   on the untested case "Let's finally do also this"). The option's name, the reuse of the `ih6_d207` drawer and the
-  range are the orchestrator's (D-283).
+  range are the orchestrator's (D-285).
 - Status: smoke-tested 2026-11-28 (sandbox, NEURON 9): `smoke_twin_manifest.py` 22 pass (two new: the default arm,
   the flag); `smoke_twin_recovery.py` 24 pass, 2 skip (two new: B30a the default plan, B30b the option, its refusals
   and one twin built with its dv_h and fitted with five names); `smoke_ih5.py` 8, `smoke_ih_trf.py` 10,
@@ -2185,6 +2185,18 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
   `ih6_d207` (the `manifest()` helper and `_plan`). `tests/spec/`: 18 checks of Blocks 16, 21, 22 relied on the old
   default and were renewed to name `ih6_d207` (dated comments); with them 507 passed, 2 skipped. Not run here: the
   cluster run (`tw8`).
+- After the final check of 2026-11-28 (report `specs/test_reports/2026-11-28_1500_incremental.md`, PASS WITH ISSUES;
+  its 30 tests `tests/spec/test_spec_block30_five_param_default.py`) [orchestrator, D-285]; no code changed:
+  (F1) a run directory planned before Block 30 with the plan's default arm records `ih_arm = ih6_d207`; a re-plan
+  or a re-submission of it without `--ih-arm` is now refused (exit 3, "options differ: ih_arm"): continue such a
+  run with `--ih-arm ih6_d207` in `PLAN_ARGS`. (F2) `--ih5-dvh-truth-range-mV` and `--dvh-truth-range-mV` take
+  their value in the `=` form only (`--ih5-dvh-truth-range-mV=-5,5`): a value starting with `-` after a space is
+  read by argparse as an option (exit 2). (F3) In a Block 30 run the merged tables carry no $\Delta v_h$ truth
+  (`recovery_extras.csv`'s `dvh_true_mV` is NaN unless $\Delta v_h$ is fitted, Block 22): the truth is read from
+  `manifest.csv` (`ih_dvh_mV`), joined on the twin's id. (S2) `numpy.bool_` counts as a bool. (S3) A reversed or
+  degenerate range (`5,-5`, `2,2`) is refused by the drawer with exit 3, not 2. (S5) `loss_verdict`'s labels
+  (`optimiser`, `data`, `tie`) are not renamed in such a run; they compare the fit's estimate with the five truths
+  at $\Delta v_h = 0$. (S1, S4) Block 21's signature and section 6's Block 22 row are annotated.
 
 ## 6. Pipeline entry points
 
@@ -2217,7 +2229,7 @@ Numbered 9, not 4b, because the roadmap tool and the tester's `changed_blocks.py
 | `python smoke_morph_inflate.py` | Block 29 smoke [added 2026-11-27] | NEURON, `./x86_64`, scikit-optimize, statsmodels | about 20 s |
 | `PLAN_ARGS="--ih-arm ih5 --twin-diam-factor 1.5 --twin-diam-max-path-um 300" RUN_TAG=... NOISE_TAG=... bash submit_twin_recovery.sh` | Block 29 on the cluster: the twins simulated on the inflated morphology, the fit on the original | PBS, conda | as a twins' run |
 | `MODE=sensitivity RUN_TAG=... NOISE_TAG=... [NCPUS=..] [N_NOISE=200] [TWINS=...] bash submit_twin_recovery.sh` | Block 28 on the cluster: one sub-job per twin, then the merge (`identifiability.csv`, `truth_trace_check.csv`) | PBS, conda | minutes per twin |
-| `RUN_TAG=... NOISE_TAG=... [NCPUS=3] [PLAN_ARGS="--ih-arm ih5"] [TWINS=...] bash submit_twin_recovery.sh` | Block 22 on the cluster: as the row above, 3 cores per twin by default (`--n-workers`), the I_h arm `ih6_d207` unless `--ih-arm ih5` [the final check's S2: the row above states Block 17's one core] | PBS, conda | 35 twins x 3 = 105 cores |
+| `RUN_TAG=... NOISE_TAG=... [NCPUS=3] [PLAN_ARGS="--ih-arm ih5"] [TWINS=...] bash submit_twin_recovery.sh` | Block 22 on the cluster: as the row above, 3 cores per twin by default (`--n-workers`), the I_h arm `ih6_d207` unless `--ih-arm ih5` [the final check's S2: the row above states Block 17's one core] | PBS, conda | 35 twins x 3 = 105 cores | [since Block 30, D-282: the default arm is `ih5`; a six-parameter run passes `--ih-arm ih6_d207`] |
 | `RUN_TAG=... NOISE_TAG=... PLAN_ARGS="--ih-arm ih5 --ih5-dvh-truth-range-mV=-5,5" [TWINS=...] bash submit_twin_recovery.sh` | Block 30 on the cluster: the five-parameter fit on twins whose truth has a $\Delta v_h$ (the truths of the `ih6_d207` plan); the gate's verdict then measures the model error | the conda env; the cluster | as a twins' run |
 
 ## 7. Not executable in the sandbox
