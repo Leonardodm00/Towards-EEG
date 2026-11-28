@@ -336,6 +336,7 @@ the "Binds" column.
 | 2026-11-28 (the step-2 implementation chat, 13:24) | No decision changed **[cluster]**: **D-099** annotated -- D-099.4 (i), the compute nodes reaching `api.brain-map.org` through `module load proxy`, failed at its first test: the screening's prepare job (job 2105296, dvnode002, 13:15) stopped at its network check after 19 s (exit 6), the RMA query to `http://api.brain-map.org` answered `403 Client Error: Forbidden` four times. Who refuses (the proxy or Allen's server) and whether https passes is being probed from the login node. Next free IDs unchanged: D-283, I-008. |
 | 2026-11-28 (the step-2 implementation chat, 13:35) | No decision changed **[cluster]**: D-099's note completed -- the login-node probe shows the cluster's proxy (`squid/5.5`, 10.17.16.110:8080) refusing `api.brain-map.org` by its access rules (`ERR_ACCESS_DENIED`) over http and https alike, and no direct route (no DNS for the host); only the proxy's administrators can open it. Next free IDs: D-283, I-008 [corrected 2026-11-28: this row first said I-009]. |
 | 2026-11-28 (the step-2 implementation chat, 13:40) | Logs **D-283** (user): the screening run (the pool, the acquisition check, the pick of D-281's 68 cells, and per cell align, nodes, calibration and screening) goes through Colab, writing to Drive, because davinci's proxy refuses Allen's server (D-099's notes); the calibration's scans files then go to davinci for step 2 (D-274). Next free IDs: D-284, I-008. |
+| 2026-11-28 (the step-2 implementation chat, 14:15) | Logs **D-284** [orchestrator] (coding directive 7): how D-283's Colab run is built -- the notebook `notebooks/screening_colab_2026-11-28` and the parallel runner of SPEC Block 63 (`scripts/survey_parallel.py`, 4 workers by default, resumable), outputs on Drive and the crop cache on the runtime's disk, the pick of the 68 with `--require-match`, the probe on the pilot first, `status.csv` through a per-process temporary (a latent fault of concurrent runs, the davinci array included), the 68 cells as `configs/screen1_cells.csv`, the last cell's `candidates_all.csv` and `screen1_scans.tgz`. On `sci/diameter-pipeline` at `15a3ada` and `713644c`. Next free IDs: D-285, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -607,6 +608,7 @@ would be needed*, *Status*.
 | D-281 | 2026-11-28 | the davinci screening run (the davinci handoff's section 10); D-226.2's reading, D-278.1's cell set; step 2's node lists | the screening export runs on every cell of the archive, each `specimen_<id>` under `L<n>_exc` and `L<n>_inh` (68 in the listing of 2026-11-28), not the 18 L3_exc cells [user]; selection by `cell_pool.py pick`, probe on the pilot 529878215, array `-J 0-67` [orchestrator] | active |
 | D-282 | 2026-11-28 | the I_h fit's arm (`run_ih_fit.py --arm`, `run_twin_recovery.py --ih-arm`); D-244 item 1, D-267, D-268 | five parameters by default, $\Delta v_h = 0$: on the ten noisy twins the six-parameter fit puts $\Delta v_h$ on the bound in 8 of 10 and triples the error of $\bar g_h$; the six-parameter arm stays as an opt-in comparison; the code's defaults not yet changed | active |
 | D-283 | 2026-11-28 | the screening run of D-226, D-278, D-281; the davinci handoff's section 10, steps 3-8; D-099.4 (i); step 2's davinci run (D-274) | the steps that read Allen's server (pool, acquisition check, pick, and per cell align, nodes, calibration, screening) run in Colab on the 68 cells, writing to Drive; the calibration's scans files are then copied to davinci for step 2 [user] | active |
+| D-284 | 2026-11-28 | D-283's run; SPEC Block 63, Block 16.2 (g)'s amendment; `notebooks/screening_colab_2026-11-28`; `configs/screen1_cells.csv`; the davinci handoff's section 11 | the Colab run's build: a notebook driving a parallel runner (W = 4 workers by default, PROVISIONAL until the probe), outputs on Drive, the crop cache on the runtime's disk, the pick with `--require-match`, the probe on the pilot first, `status.csv` through a per-process temporary, the candidates merged and the scans files archived for davinci [orchestrator] | active; implemented `15a3ada` |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -17135,3 +17137,52 @@ the route of the copy to davinci; what happens to the October Colab caches.
 2026-11-28), D-274, D-278 to D-281. **[src]** `step2_measure.py`, `allen_image_io.py`.
 
 **Status:** active.
+
+---
+
+## D-284 -- How the Colab screening run is built: a parallel runner, Drive for outputs, the cache on the runtime's disk, the pick that stops on a bad cell, and status.csv per process [orchestrator]
+
+**Date:** 2026-11-28, 14:15 (Europe/Rome), the step-2 implementation chat. **Binds:** D-283's run; SPEC Block 63
+(`scripts/survey_parallel.py`), Block 16.2 (g)'s amendment (`survey_io.write_status`); the notebook
+`notebooks/screening_colab_2026-11-28` (`.py` and `.ipynb`); `configs/screen1_cells.csv`; the davinci handoff's
+section 11.
+
+**Decision [orchestrator]** (coding directive 7: plumbing, no change to the science). The choices of the build that
+D-283 left to the orchestrator.
+
+**Statement.** (D-284.1) The run is a notebook in the October notebook's form (Cells 0 and 1: Drive, the clone, the
+`run()` helper) driving the existing scripts, and a parallel runner, SPEC Block 63: the cells not done are split
+round-robin among `WORKERS` processes (default 4), each one `survey_cells.py run --cells <its cells>`; finished
+steps leave markers, so the run resumes across Colab sessions. The number of workers is set again from the probe's
+times (PROVISIONAL). (D-284.2) Outputs on Drive, `MyDrive/diameters/survey_screen1` (what must survive a
+disconnection: markers, sheets, scans files, logs); the crop cache on the runtime's own disk,
+`/content/allen_cache_screen1`, one folder per cell (a cell needs its crops only while it runs; Drive is slow with
+many small files and its quota is the user's). (D-284.3) The acquisition check runs over the whole pool, as in
+October, and the pick of the 68 takes `--acquisition --require-match`: a cell outside Allen's pool or imaged at other
+settings stops the run before any cell is processed, as the davinci plan's rule did (section 10, step 4). (D-284.4)
+The probe runs the pilot 529878215 alone first (its earlier steps are known to work in Colab). (D-284.5)
+`survey_io.write_status` writes `status.csv` through a temporary named after the process: runs on one out_dir wrote
+it through one shared name, so one run could move another's half-written file away and crash on its own rename,
+stopping its remaining cells -- a latent fault of the davinci array design too; fixed, with an oracle that fails on
+the old code. (D-284.6) The 68 cells are committed as `configs/screen1_cells.csv` (from the user's listing,
+D-281.1). (D-284.7) The notebook's last cell writes `survey_screen1/candidates_all.csv` (every cell's candidates,
+the header once: the file the user cuts down to `chosen_nodes.csv`) and `screen1_scans.tgz` (the selection and each
+cell's scans file under `screen1/`, to be unpacked on davinci in `.../Human Neurons Fitting/diameter_survey/`).
+
+**Why.** **[run, sandbox]** `tests/smoke/test_smoke_survey_parallel.py` 7 pass, 1 skip (the partition, the states,
+a 7-cell run through a stub runner, resumption, failures, SIGTERM, `status.csv` written by two processes); the survey
+suites that touch the runner rerun, all pass; the notebook's cells executed in order against a stand-in archive
+(Colab and Allen replaced). **[log]** October's Colab times (D-099; the October notebook's notes): the acquisition
+check 6.6 min for 158 cells, the step `nodes` about an hour per cell of 120 nodes -- hence workers in parallel.
+**[reasoning]** downloads wait on the network, so several cells at once shorten the run until the runtime's CPUs or
+Allen's server limit it; the probe measures it.
+
+**What it implies for code and tables.** Committed on `sci/diameter-pipeline` at `15a3ada` (code, test, notebook, cell
+list, SPEC Block 63 and 16.2 (g)'s amendment, roadmap I63) and `713644c` (the handoff's section 11).
+
+**What it does not decide.** The final number of workers; whether the October Drive cache is reused; the route of
+the copy to davinci; step 2's davinci entry point (wave 2).
+
+**Sources.** **[src]** the commits above. **[run, sandbox]** as in Why. **[log]** D-099, D-281, D-283.
+
+**Status:** active; implemented 2026-11-28 (`15a3ada`, `713644c`); not run in Colab yet.
