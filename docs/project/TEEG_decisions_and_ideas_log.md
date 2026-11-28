@@ -338,6 +338,7 @@ the "Binds" column.
 | 2026-11-28 (the step-2 implementation chat, 13:40) | Logs **D-283** (user): the screening run (the pool, the acquisition check, the pick of D-281's 68 cells, and per cell align, nodes, calibration and screening) goes through Colab, writing to Drive, because davinci's proxy refuses Allen's server (D-099's notes); the calibration's scans files then go to davinci for step 2 (D-274). Next free IDs: D-284, I-008. |
 | 2026-11-28 (the step-2 implementation chat, 14:15) | Logs **D-284** [orchestrator] (coding directive 7): how D-283's Colab run is built -- the notebook `notebooks/screening_colab_2026-11-28` and the parallel runner of SPEC Block 63 (`scripts/survey_parallel.py`, 4 workers by default, resumable), outputs on Drive and the crop cache on the runtime's disk, the pick of the 68 with `--require-match`, the probe on the pilot first, `status.csv` through a per-process temporary (a latent fault of concurrent runs, the davinci array included), the 68 cells as `configs/screen1_cells.csv`, the last cell's `candidates_all.csv` and `screen1_scans.tgz`. On `sci/diameter-pipeline` at `15a3ada` and `713644c`. Next free IDs: D-285, I-008. |
 | 2026-11-28 (the review chat, afternoon) | Logs **D-285** (user; orchestrator): Block 30 on `sci/twins` (`e05b5ec`): the code's defaults are five parameters (D-282.3 discharged for the three Python defaults); a plan option for the five-parameter fit on twins with a $\Delta v_h$ truth (run `tw8`); the real cells' submitter left open. |
+| 2026-11-28 (the review chat, afternoon, 2) | D-285's status updated: the independent check of Block 30 (PASS WITH ISSUES) settled in SPEC without a code change (`sci/twins` `4c64661`). |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -17225,4 +17226,4 @@ $g_h$ at a reference voltage for the real cells; the real cells' submitter (D-28
 
 **Sources.** **[user]** as quoted; **[run]** the sandbox's suites named above; **[log]** D-206, D-244, D-268, D-269, D-282.
 
-**Status:** active; `tw8` not yet run.
+**Status:** active; `tw8` not yet run. [updated 2026-11-28: the independent check (an Opus agent that wrote none of the block; report `Ih Fit/specs/test_reports/2026-11-28_1500_incremental.md`) gave PASS WITH ISSUES: no wrong result, three notes and five gaps in the spec, all settled in SPEC's Block 30 entry without a code change (`sci/twins` `4c64661`): a run planned before Block 30 with the old default arm is continued with `--ih-arm ih6_d207`; the range options take the `=` form; the merged tables of `tw8` carry no $\Delta v_h$ truth, which is read from `manifest.csv`.]
