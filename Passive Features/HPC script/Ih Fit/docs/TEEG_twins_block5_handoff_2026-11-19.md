@@ -29,6 +29,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-27 (the defocus-table chat) | With the user's OK, the review chat's D-250 (the final check of Blocks 23 to 28) is renumbered **D-262** in the log, ending the clash with the soma fit's D-250; this handoff's two citations corrected. The citations of D-250 in `Ih Fit/` on `sci/twins` (SPEC Block 28's notes, `run_twin_recovery.py`, `smoke_twin_sensitivity.py`, `tests/spec/test_spec_block8_twin_recovery.py`, `tests/spec/test_spec_block22_twin_recovery_run3.py`) were left untouched so as not to mark Block 28 as changed: they mean D-262; update them the next time those files change. |
 | 2026-11-27 (the review chat) | Section 7: the results of the sensitivity run `tw5` on the ten noisy twins **[data inspected]** and what they imply for the gate, the exclusion rule and $\tau_d$ (not decided). |
 | 2026-11-27 (the review chat, 2) | Section 7: the results of the fit run `tw5` (least-squares refinement, the ten noisy twins) **[data inspected]**: every start converged, one minimum per twin, the gate's medians pass; the assistant's earlier estimate that the gate could not pass corrected. |
+| 2026-11-28 (the review chat) | Section 7: the results of `tw6` (six parameters) and `tw7` (inflated generating morphology) **[data inspected]**: $\Delta v_h$ on the bound in 8 of 10 twins and the h-current errors larger than in `tw5`; a diameter error of x 1.5 is absorbed by $C_m$, $R_m$, $R_a$ and $\bar g_h$ with the loss nearly unchanged. No decision taken. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -556,6 +557,25 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
   `RUN_TAG=tw7 NOISE_TAG=nf2 NCPUS=24 PLAN_ARGS="--ih-arm ih5 --twin-diam-factor 1.5 --twin-diam-max-path-um 300" TWINS=900000000,...,900000009 WALLTIME=48:00:00 bash submit_twin_recovery.sh`.
   Both build their own twins (`tw6`: other truths; `tw7`: other traces), so nothing is copied from `tw4`/`tw5`.
   Read `tw7` against `tw5` twin by twin: same truths, same noise seeds, only the generating morphology differs.
+- **Results of `tw6` and `tw7` [data inspected, 2026-11-28; tables `report/recovery_per_cell.csv`, `recovery_extras.csv`,
+  `twins_status.csv` of each run; code `8b05c56`, working tree reported dirty by the jobs].** All 20 fits ended `ok`
+  (2.1 to 9.9 h per fit). In every fit the loss at the estimate is at or below the loss at the truth (19 `data`, 1 `tie`).
+  - **`tw6` (six parameters).** Passive medians unchanged from `tw5` (median |ln error| $C_m$ 0.038, $R_m$ 0.059, $R_a$ 0.076).
+    $\Delta v_h$: 8 of 10 estimates on the search bound ($\pm 10$ mV), 1 of 10 within the 3 mV tolerance, median |error| 5.6 mV.
+    $\bar g_h$ median |ln error| 0.58 (`tw5`: 0.17), $\kappa_\tau$ 0.41 (`tw5`: 0.16); gate FAIL. The product
+    $\bar g_h e^{\Delta v_h / k}$, $k = 8.05$ mV, has median |ln error| 0.21. Starts converged: 3/3 in seven twins,
+    2/3 in twins 03 and 08, 1/3 in twin 06. Caveat: `tw6`'s twins are not `tw5`'s (truth $\Delta v_h \in [-5, 5]$ mV and other
+    $\kappa_\tau$ truths; $C_m$, $R_m$, $\bar g_h$ truths equal), so the comparison is between runs, not paired. Not tested: a
+    five-parameter fit on twins whose truth has $\Delta v_h \neq 0$. **[open]** the five-versus-six choice (D-244 item 1) is the user's.
+  - **`tw7` (twin on diameters x 1.5 up to 300 um, fit on the original).** Paired shift against `tw5`, median over the ten
+    twins (min, max) of ln(estimate/truth): $C_m$ +0.410 (+0.390, +0.532), $R_m$ -0.371 (-0.486, -0.256), $R_a$ -0.832
+    (-0.872, -0.743), $\bar g_h$ +0.432 (+0.002, +1.176), $\kappa_\tau$ -0.082 (-0.455, +0.161). As factors on the median
+    estimate: $C_m$ x 1.50, $R_m$ x 0.71, $R_a$ x 0.41, $\bar g_h$ x 1.50, $\kappa_\tau$ x 0.99. The fit quality does not show
+    the error: loss at the estimate 0.008 to 0.036 (`tw5`: 0.005 to 0.022), loss at the truth 0.33 to 0.63. Twin 08: 0 of 3
+    starts met a convergence test. The gate's FAIL here measures the diameter bias, not the optimiser (D-269).
+    **[reasoning]** the shifts match area x 1.5 ($\ln 1.5 = 0.405$ for $C_m$, $\bar g_h$, $-0.405$ for $R_m$) and axial
+    resistance per length $\propto R_a / d^2$ ($-2 \ln 1.5 = -0.811$ for $R_a$); $R_m$ falls short because only the first
+    300 um are inflated. Figures and scripts: the review chat of 2026-11-28 (`fig67.py`, `cmp67.py`; not in the repository).
 
 ## 8. Repository, environment, cluster
 
