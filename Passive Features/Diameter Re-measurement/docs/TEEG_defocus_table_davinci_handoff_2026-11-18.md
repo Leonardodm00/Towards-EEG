@@ -14,6 +14,7 @@
 | 2026-11-28 (later) | The step-2 implementation chat (13:18): section 10 gains the checks of step 3 (the job's record, the log's lines, and the archive's 68 cells against the pool and the acquisition check), tested on a stand-in of the archive with the job's own `pool`, `check` and `select` commands and on a broken variant; row 3 points to them. No decision. |
 | 2026-11-28 (later, 2) | The step-2 implementation chat (13:24): section 10 gains a status note -- step 3's first run (job 2105296) exited 6 at the network check, `http://api.brain-map.org` answering 403 Forbidden through `module load proxy` -- and the login-node probe that tells who refuses (tested against stubs of the module and of curl). |
 | 2026-11-28 (later, 3) | The step-2 implementation chat (13:35): section 10's status note gains the probe's result -- the cluster's proxy refuses `api.brain-map.org` by its access rules over http and https, and the login node has no direct route; the run waits for the proxy's administrators or another route. |
+| 2026-11-28 (later, 4) | The step-2 implementation chat (14:10): **D-283** (user) -- the run goes through Colab. New section 11 (the notebook `notebooks/screening_colab_2026-11-28`, the parallel runner of SPEC Block 63, where the outputs land, what comes back to davinci); section 10's status note marked superseded for steps 3 to 8. |
 
 **Status [updated 2026-11-23, D-226]:** the run below -- every eligible cell of the 158 (D-175.1), the nodes chosen by Block 10's rules -- is superseded for the cell set and the choice of nodes. The screening runs on davinci only on the cells of the passive + I_h fit (in the assistant's reading the 18 L3_exc cells, to be confirmed) and exports, for every apt node, its image at focus with $k^* \pm 3$ (near set) or $k^* \pm 1$ to $k^* \pm 16$ (far set, `far_offsets_planes`, D-074.1), each plane's image beside its intensity profile along the node's measuring line (D-227); the user picks the clearest nodes and sets their diameters by eye in a Colab notebook [corrected 2026-11-27, D-261: no diameter is set by eye and there is no such notebook; the image at focus also shows Allen's diameter, and the user picks the nodes whose Allen's diameter agrees with that image and whose background is clean across planes]; the calibration then runs on the picked nodes (steps 1 and 2, step 2's twins at Allen's diameter, D-261). None of this is built yet; sections 2, 5, 7 and 9 stay as the record of the 158-cell plan.
 
@@ -191,7 +192,7 @@ the far slope each move by less than one SE, at most 5 rounds.
 
 ## 10. The screening run (D-226, D-227, D-261, D-278) [added 2026-11-27]
 
-**Status [2026-11-28, 13:15]: blocked at step 3.** The prepare job (job 2105296, dvnode002) stopped at its network check after 19 s (exit 6, `Exit_status = 6`): the RMA query to `http://api.brain-map.org` (specimen 529878215) through `module load proxy` was answered `403 Client Error: Forbidden` four times; nothing was written. This is the first diameter job to reach for Allen's server from davinci (D-099.4 (i), unverified until now; the decision log's D-099 note). Steps 4 to 8 wait for the probe below, run on the login node: it prints the job's log (credentials in a proxy address masked) and, with the proxy module loaded, the response headers to the same query over http and https, through the proxy and direct; the headers say who refuses (a proxy's error headers, or Allen's server).
+**Status [2026-11-28, 13:15]: blocked at step 3.** **[superseded 2026-11-28, 13:35, D-283: the run goes through Colab, section 11; steps 3 to 8 below are not run on davinci]** The prepare job (job 2105296, dvnode002) stopped at its network check after 19 s (exit 6, `Exit_status = 6`): the RMA query to `http://api.brain-map.org` (specimen 529878215) through `module load proxy` was answered `403 Client Error: Forbidden` four times; nothing was written. This is the first diameter job to reach for Allen's server from davinci (D-099.4 (i), unverified until now; the decision log's D-099 note). Steps 4 to 8 wait for the probe below, run on the login node: it prints the job's log (credentials in a proxy address masked) and, with the proxy module loaded, the response headers to the same query over http and https, through the proxy and direct; the headers say who refuses (a proxy's error headers, or Allen's server).
 
 ```bash
 O=$(ls -t "$HOME"/diam_survey_prep.o* | head -1) && echo "== $O" && sed -E "s#//[^/@]*@#//<credentials>@#" "$O" && ( module load proxy && echo "== $(hostname): module proxy loaded"; env | grep -i "_proxy=" | sed -E "s#//[^/@]*@#//<credentials>@#"; T=$(mktemp); for u in http https; do for r in proxy direct; do echo "== $u, $r"; X=""; [ "$r" = direct ] && X="--noproxy api.brain-map.org"; curl -sS --connect-timeout 10 -m 30 $X -D - -o "$T" "$u://api.brain-map.org/api/v2/data/query.json?criteria=model::Specimen,rma::criteria,%5Bid%24eq529878215%5D" | tr -d '\r'; echo "-- body: $(head -c 400 "$T" | tr -d '\r\n')"; : > "$T"; done; done; rm -f "$T" ) 2>&1 | tee "$HOME/allen_net_probe_login.txt"
@@ -271,3 +272,40 @@ What comes back from the user (D-261.2, D-275.3): one file `chosen_nodes.csv` wi
 once and the chosen nodes' rows, made from the `candidates_<sid>.csv` files by deleting the rows not wanted. Step 2
 reads it with `step2_io.read_chosen_nodes`; the cells' scans files (`<sid>/calibration/scans_<sid>.json`, now with
 the full configuration in `meta`) are step 2's other input.
+
+
+## 11. The screening run in Colab (D-283, D-284) [added 2026-11-28]
+
+Why: davinci's proxy refuses Allen's server over http and https (section 10's status note; the decision log, D-099's
+notes of 2026-11-28), so the run of section 10 goes through Colab with the same cells (`configs/screen1_cells.csv`,
+the 68 of D-281), steps (align, nodes, calibration, screening) and configuration (`configs/survey_screen1.json`).
+Section 10's steps 3 to 8 are superseded; its steps 1 and 2 are not needed.
+
+The notebook: `notebooks/screening_colab_2026-11-28.ipynb` (its twin `.py` in jupytext percent form), opened in
+Colab from GitHub:
+`https://colab.research.google.com/github/Leonardodm00/Towards-EEG/blob/sci/diameter-pipeline/Passive%20Features/Diameter%20Re-measurement/notebooks/screening_colab_2026-11-28.ipynb`.
+Each cell's text says what must appear in its output. In short: Cells 0 and 1 in every session; Cell 2 the pool,
+the acquisition check over the pool and the pick of the 68 with `--require-match` (`pick: 68 cells`; a cell outside
+the pool or imaged at other settings stops it); Cell 3 the probe on the pilot 529878215 (its four step lines and the
+`[cell 3]` line come back to the chat: they set the number of workers and give the run's length); Cell 4 every cell
+with `scripts/survey_parallel.py` (SPEC Block 63), `WORKERS` at a time, resumable; Cell 5 the status; Cell 6
+`candidates_all.csv` and `screen1_scans.tgz`.
+
+Where things land: on Drive `MyDrive/diameters/survey_screen1/<id>/` (the sheets `screening/near_<node>.png`,
+`screening/far_<node>.png`, the scans file `calibration/scans_<id>.json`, the markers `done/<step>.json`,
+`errors.log`), the workers' logs in `survey_screen1/logs/`; the crop cache on the runtime's disk,
+`/content/allen_cache_screen1/<id>/`, lost with the runtime and fetched again for a cell stopped in the middle of a
+step (D-284.2).
+
+What comes back: `chosen_nodes.csv`, cut down from `survey_screen1/candidates_all.csv` (D-261.2, D-275.3), and
+`MyDrive/diameters/screen1_scans.tgz`, copied to davinci as a binary file and unpacked in
+`/davinci-1/home/ldellamea/Human Neurons Fitting/diameter_survey/` (it creates `screen1/selection.csv` and
+`screen1/<id>/calibration/scans_<id>.json`), where step 2's davinci run (D-274) reads them; its entry point is wave
+2's and not built yet.
+
+Checked in the sandbox **[run]**: `tests/smoke/test_smoke_survey_parallel.py` 7 pass, 1 skip; the survey suites that
+touch the runner rerun, all pass; the notebook's cells executed in order against a stand-in archive with Colab's
+Drive and display replaced, `pool` and `check` replaced by copies of their outputs and Cell 3's survey run by fake
+outputs, Cell 4 through the parallel runner with a stub survey runner: the pick of the 68, the probe's summary, the
+run, the status and Cell 6's two files as expected; a cell imaged at another plane spacing stops Cell 2 at the
+pick. Not run here: Cell 1's clone (the October notebook's code) and everything that reads Allen's server **[open]**.
