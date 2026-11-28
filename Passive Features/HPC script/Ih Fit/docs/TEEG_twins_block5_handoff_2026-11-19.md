@@ -30,6 +30,7 @@ start, `TEEG_noise_fit_block6_handoff_2026-11-12.md` (this folder), which stays 
 | 2026-11-27 (the review chat) | Section 7: the results of the sensitivity run `tw5` on the ten noisy twins **[data inspected]** and what they imply for the gate, the exclusion rule and $\tau_d$ (not decided). |
 | 2026-11-27 (the review chat, 2) | Section 7: the results of the fit run `tw5` (least-squares refinement, the ten noisy twins) **[data inspected]**: every start converged, one minimum per twin, the gate's medians pass; the assistant's earlier estimate that the gate could not pass corrected. |
 | 2026-11-28 (the review chat) | Section 7: the results of `tw6` (six parameters) and `tw7` (inflated generating morphology) **[data inspected]**: $\Delta v_h$ on the bound in 8 of 10 twins and the h-current errors larger than in `tw5`; a diameter error of x 1.5 is absorbed by $C_m$, $R_m$, $R_a$ and $\bar g_h$ with the loss nearly unchanged. No decision taken. |
+| 2026-11-28 (the review chat, 2) | Section 7: five parameters by default (D-282) in the code (Block 30, `e05b5ec`), the run `tw8` and its command (D-285); the real cells' submitter flagged as not yet changed. |
 
 **Basis tags.** **[src]** read from the code, SPEC or roadmap on `main` (`b17f768`); **[log]** the decision log's
 text; **[user]** the user's words or decision; **[cluster]** output the user pasted from davinci; **[run]** executed
@@ -576,6 +577,15 @@ D-188: the cells are drawn independently per configuration (30 twins), and the p
     **[reasoning]** the shifts match area x 1.5 ($\ln 1.5 = 0.405$ for $C_m$, $\bar g_h$, $-0.405$ for $R_m$) and axial
     resistance per length $\propto R_a / d^2$ ($-2 \ln 1.5 = -0.811$ for $R_a$); $R_m$ falls short because only the first
     300 um are inflated. Figures and scripts: the review chat of 2026-11-28 (`fig67.py`, `cmp67.py`; not in the repository).
+- **Five parameters by default [user, D-282, 2026-11-28] and the run `tw8` [user; D-285; code `sci/twins` `e05b5ec`, Block 30].**
+  The Python defaults are now `ih5` (`run_ih_fit.py --arm`, the twins' plan and manifest); the six-parameter arms are named
+  explicitly. NOT changed: `submit_ih_fit.sh` (the real cells' submitter: default `ARM=ih6`, refuses `ih5`, passes no
+  refinement option) **[open, D-285.4]**. `tw8`: the ten noisy twins of `tw6` (truth $\Delta v_h \in [-5, 5]$ mV, same
+  truths and noise seeds) fitted with five parameters:
+  `RUN_TAG=tw8 NOISE_TAG=nf2 NCPUS=24 PLAN_ARGS="--ih-arm ih5 --ih5-dvh-truth-range-mV=-5,5" TWINS=900000000,...,900000009 WALLTIME=48:00:00 bash submit_twin_recovery.sh`.
+  Read it against `tw6` twin by twin (same data, five against six parameters) and against `tw5`. Its "loss at the truth",
+  `loss_verdict` and gate use the five truths with $\Delta v_h = 0$, which is not the generating model: they measure the
+  model error. **[reasoning]** expected error of $\ln \bar g_h$ about $\Delta v_h / k$, $k = 8.05$ mV.
 
 ## 8. Repository, environment, cluster
 
