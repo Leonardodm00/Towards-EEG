@@ -738,6 +738,15 @@ implementation:
     needs_theory: []
     needs_hpc: true
     jobs: ["Passive Features/HPC script/Ih Fit/submit_twin_recovery.sh", twin_recovery, twin_merge]
+  - id: B30
+    title: "Block 30: five parameters by default; the five-parameter fit on twins with a dv_h truth"
+    summary: "The code's default arm becomes the five-parameter one (the half-activation shift fixed at 0), and a plan option draws twins whose truth has a non-zero shift while the fit keeps five parameters: a test of what an unmodelled shift does to the five estimates."
+    block: 30
+    parent: G5
+    depends_on: [B28]
+    needs_theory: []
+    needs_hpc: true
+    jobs: ["Passive Features/HPC script/Ih Fit/submit_twin_recovery.sh", twin_recovery, twin_merge]
 
 revisions:
   - stage: N3
