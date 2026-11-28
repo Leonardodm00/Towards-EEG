@@ -335,6 +335,7 @@ the "Binds" column.
 | 2026-11-28 (the review chat, 13:13) | Logs **D-282** (user) after the twins' run `tw6` **[data inspected]**: the I_h fit has five parameters by default ($\Delta v_h = 0$); D-244 item 1's open point closed. The run `tw7` (inflated generating morphology) is recorded in the twins handoff's section 7; it carries no decision. |
 | 2026-11-28 (the step-2 implementation chat, 13:24) | No decision changed **[cluster]**: **D-099** annotated -- D-099.4 (i), the compute nodes reaching `api.brain-map.org` through `module load proxy`, failed at its first test: the screening's prepare job (job 2105296, dvnode002, 13:15) stopped at its network check after 19 s (exit 6), the RMA query to `http://api.brain-map.org` answered `403 Client Error: Forbidden` four times. Who refuses (the proxy or Allen's server) and whether https passes is being probed from the login node. Next free IDs unchanged: D-283, I-008. |
 | 2026-11-28 (the step-2 implementation chat, 13:35) | No decision changed **[cluster]**: D-099's note completed -- the login-node probe shows the cluster's proxy (`squid/5.5`, 10.17.16.110:8080) refusing `api.brain-map.org` by its access rules (`ERR_ACCESS_DENIED`) over http and https alike, and no direct route (no DNS for the host); only the proxy's administrators can open it. Next free IDs: D-283, I-008 [corrected 2026-11-28: this row first said I-009]. |
+| 2026-11-28 (the step-2 implementation chat, 13:40) | Logs **D-283** (user): the screening run (the pool, the acquisition check, the pick of D-281's 68 cells, and per cell align, nodes, calibration and screening) goes through Colab, writing to Drive, because davinci's proxy refuses Allen's server (D-099's notes); the calibration's scans files then go to davinci for step 2 (D-274). Next free IDs: D-284, I-008. |
 
 Basis tags: **[KB]** read from a project-knowledge full text; **[reasoning]**
 the assistant's own derivation, hypotheses stated; **[user]** the user's
@@ -605,6 +606,7 @@ would be needed*, *Status*.
 | D-280 | 2026-11-28 | the screening sheets (SPEC Blocks 61, 62); D-261.1's marks | Allen's diameter is drawn as two short, thin segments parallel to the node's heading at $\pm D_{\rm A}/2$ across the branch, not as circles [user]; length 1.0 um, width 0.8 pt PROVISIONAL [orchestrator] | active |
 | D-281 | 2026-11-28 | the davinci screening run (the davinci handoff's section 10); D-226.2's reading, D-278.1's cell set; step 2's node lists | the screening export runs on every cell of the archive, each `specimen_<id>` under `L<n>_exc` and `L<n>_inh` (68 in the listing of 2026-11-28), not the 18 L3_exc cells [user]; selection by `cell_pool.py pick`, probe on the pilot 529878215, array `-J 0-67` [orchestrator] | active |
 | D-282 | 2026-11-28 | the I_h fit's arm (`run_ih_fit.py --arm`, `run_twin_recovery.py --ih-arm`); D-244 item 1, D-267, D-268 | five parameters by default, $\Delta v_h = 0$: on the ten noisy twins the six-parameter fit puts $\Delta v_h$ on the bound in 8 of 10 and triples the error of $\bar g_h$; the six-parameter arm stays as an opt-in comparison; the code's defaults not yet changed | active |
+| D-283 | 2026-11-28 | the screening run of D-226, D-278, D-281; the davinci handoff's section 10, steps 3-8; D-099.4 (i); step 2's davinci run (D-274) | the steps that read Allen's server (pool, acquisition check, pick, and per cell align, nodes, calibration, screening) run in Colab on the 68 cells, writing to Drive; the calibration's scans files are then copied to davinci for step 2 [user] | active |
 | D-174 | 2026-11-18 | the first stage (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Blocks 3, 5) and its users: the calibration's measurement, verdict and scan of each candidate (Blocks 10, 15, 19.3), the survey (Block 17), the bias table (Blocks 6, 14); D-173.3 | the first stage with the diameter held at Allen's (D-173) becomes the default once built [user]; for every user of the first stage, D-173.3 superseded, the free diameter a labelled alternative, a configuration field in the estimator's signature [orchestrator, PROVISIONAL]; the davinci run's `nodes` and `calibration` steps wait for it [orchestrator] | active; implemented at `513ad9e` (2026-11-18) |
 | D-173 | 2026-11-18 | the first-stage fit of a node (`node_pipeline.measure_pilot`, SPEC section 2.2 Eq. (3), Block 3) as used by D-169's fit on clear nodes; D-169.2, D-171.6 | in the first stage the diameter is fixed at Allen's value and the other parameters (absorption, lateral centre) are fitted [user]; this as a setting of the first stage for this path, its other users (the calibration's selection, the survey, the bias table) unchanged [orchestrator], PROVISIONAL | active; (D-173.3) superseded by D-174 |
 | D-172 | 2026-11-18 | `renderer.sigma_r0_um`; D-169's fit on clear nodes; `clean_cell.py --sigma-r0-um` (D-165) | the kernel's in-focus width stays at the configured 0.080 um for now; the option to run at another width is kept [user] | active |
@@ -17095,3 +17097,41 @@ value of $v_h$ itself (Rich et al. 2021 kinetics, D-206) is not re-examined.
 twins handoff's section 7 (`4c9e20b`).
 
 **Status:** active; the code's defaults not yet changed (D-282.3).
+
+---
+
+## D-283 -- The screening run goes through Colab, because davinci's proxy refuses Allen's server (user)
+
+**Date:** 2026-11-28, 13:35 (Europe/Rome), the step-2 implementation chat. **Binds:** the screening run of D-226,
+D-278, D-281 (the pool, the acquisition check, the pick, and per cell the steps align, nodes, calibration,
+screening); the davinci handoff's section 10 (steps 3 to 8); D-099.4 (i); step 2's davinci run (D-274), which reads
+the calibration's scans files.
+
+**Decision [user].** "let's pass through colab then", answering the assistant's proposal of 13:31: "run the steps that
+read from Allen in Colab, where Allen is reachable, and copy the results to davinci", the alternative being to wait
+for davinci's administrators to allow Allen's host through the proxy.
+
+**Statement.** (D-283.1) Every step of the screening run that reads Allen's server -- the pool (`cell_pool.py pool`),
+the acquisition check, the pick of the 68 cells of D-281, and per cell the steps align, nodes, calibration and
+screening -- runs in Colab, writing to Google Drive [user]. (D-283.2) The calibration's scans files (with the
+selection) are then copied to davinci, where step 2 runs as D-274 sets; step 2's fit reads no network (its blocks
+render the twins and read the scans files) [user, the proposal as stated; code read: `step2_*` take only the class
+`CropFrame` from `allen_image_io`]. (D-283.3) The run's content does not change: the same cells (D-281), steps,
+configuration (`configs/survey_screen1.json`) and sheets (D-278 to D-280).
+
+**Why.** **[cluster]** the login-node probe of 13:29 (D-099's note): the cluster's proxy refuses `api.brain-map.org`
+by its access rules (`ERR_ACCESS_DENIED`) over http and https alike, and the login node has no direct route; only
+the proxy's administrators can change that, on a time scale the user does not control.
+
+**What it implies for code and tables.** A Colab notebook for the run and a parallel runner of `survey_cells.py`
+(built in this chat; their choices are logged when built); the handoff's section 10 is superseded for steps 3 to 8 by
+the Colab procedure.
+
+**What it does not decide.** Whether davinci's administrators are also asked to allow the host (a draft request is in
+the chat); the number of parallel workers and where the crop cache lives (the orchestrator's, logged with the build);
+the route of the copy to davinci; what happens to the October Colab caches.
+
+**Sources.** **[user]** 2026-11-28, 13:35. **[cluster]** the probe output of 13:29. **[log]** D-099 (its notes of
+2026-11-28), D-274, D-278 to D-281. **[src]** `step2_measure.py`, `allen_image_io.py`.
+
+**Status:** active.
